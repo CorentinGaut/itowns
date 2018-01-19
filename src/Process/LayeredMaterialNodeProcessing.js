@@ -228,9 +228,17 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
     }
 
     const currentLevel = node.material.getColorLayerLevelById(layer.id);
-    const zoom = node.getCoordsForLayer(layer)[0].zoom || node.level;
-    const targetLevel = chooseNextLevelToFetch(layer.updateStrategy.type, node, zoom, currentLevel, layer);
+    const bestLevel = node.getCoordsForLayer(layer)[0].zoom || node.level;
+    let targetLevel = node.layerUpdateState[layer.id].targetLevel ? node.layerUpdateState[layer.id].targetLevel - 1 :
+        chooseNextLevelToFetch(layer.updateStrategy.type, node, bestLevel, currentLevel, layer);
+
+    targetLevel = Math.min(layer.options.zoom.max, targetLevel);
+
     if (targetLevel <= currentLevel) {
+        return;
+    }
+    if (!layer.tileInsideLimit(node, layer, targetLevel)) {
+        node.layerUpdateState[layer.id].noMoreUpdatePossible();
         return;
     }
 
@@ -274,6 +282,10 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
                     console.warn(`Imagery texture update error for ${node}: ${err}`);
                 }
                 const definitiveError = node.layerUpdateState[layer.id].errorCount > MAX_RETRY;
+                if (layer.protocol == 'wmts' || layer.protocol == 'wmtsc') {
+                    // keep the targetLevel that caused an error
+                    node.layerUpdateState[layer.id].targetLevel = targetLevel;
+                }
                 node.layerUpdateState[layer.id].failure(Date.now(), definitiveError);
                 if (!definitiveError) {
                     window.setTimeout(() => {
