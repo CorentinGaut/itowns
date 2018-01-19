@@ -163,7 +163,7 @@ Extent.prototype.as = function as(crs) {
     });
 };
 
-Extent.prototype.offsetToParent = function offsetToParent(other) {
+Extent.prototype.offsetToParent = function offsetToParent(other, target = new THREE.Vector4()) {
     if (this.crs() != other.crs()) {
         throw new Error('unsupported mix');
     }
@@ -175,7 +175,7 @@ Extent.prototype.offsetToParent = function offsetToParent(other) {
         const r = (this._row - (this._row % diff)) * invDiff;
         const c = (this._col - (this._col % diff)) * invDiff;
 
-        return new THREE.Vector4(
+        return target.set(
             this._col * invDiff - c,
             this._row * invDiff - r,
             invDiff, invDiff);
@@ -199,7 +199,7 @@ Extent.prototype.offsetToParent = function offsetToParent(other) {
         Math.abs(
             this.north(other._internalStorageUnit) - this.south(other._internalStorageUnit)) / dimension.y;
 
-    return new THREE.Vector4(originX, originY, scaleX, scaleY);
+    return target.set(originX, originY, scaleX, scaleY);
 };
 
 Extent.prototype.west = function west(unit) {
