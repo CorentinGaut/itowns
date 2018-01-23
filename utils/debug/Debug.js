@@ -1,3 +1,4 @@
+import { CameraHelper } from 'three';
 import Coordinates from '../../src/Core/Geographic/Coordinates';
 import ThreeStatsChart from './charts/ThreeStatsChart';
 
@@ -28,6 +29,7 @@ function Debug(view, datDebugTool, chartDivContainer) {
     this.charts.push(new ThreeStatsChart('three-info', view.mainLoop.gfxEngine.renderer));
 
     const charts = this.charts;
+    const tileLayer = view.tileLayer || view.wgs84TileLayer || view.baseLayer;
 
     function debugChartUpdate(updateDuration) {
         const displayed = chartDivContainer.style.display != 'none';
@@ -40,6 +42,8 @@ function Debug(view, datDebugTool, chartDivContainer) {
     const state = {
         displayCharts: false,
         eventsDebug: false,
+        debugCameraWindow: false,
+        freeze: false,
     };
 
     // charts
@@ -48,6 +52,22 @@ function Debug(view, datDebugTool, chartDivContainer) {
             chartDivContainer.style.display = 'flex';
         } else {
             chartDivContainer.style.display = 'none';
+        }
+    });
+
+    gui.add(state, 'debugCameraWindow').name('debug Camera').onChange(() => {
+        view.notifyChange(true);
+    });
+
+
+    let update = tileLayer.update;
+    gui.add(state, 'freeze').name('freeze update').onChange((newValue) => {
+        if (newValue) {
+            update = tileLayer.update;
+            tileLayer.update = () => {};
+        } else {
+            tileLayer.update = update;
+            view.notifyChange(true);
         }
     });
 
@@ -94,6 +114,50 @@ function Debug(view, datDebugTool, chartDivContainer) {
         const duration = Date.now() - before;
         // debug graphs update
         debugChartUpdate(duration);
+    };
+
+    // Camera debug
+    const helper = new CameraHelper(view.camera.camera3D);
+    const debugCamera = view.camera.camera3D.clone();
+    const g = view.mainLoop.gfxEngine;
+    const r = g.renderer;
+    let fogDistance = view.fogDistance;
+    helper.visible = false;
+    view.scene.add(helper);
+
+    function tileDisplay(obj) {
+        if (obj.setFog && fogDistance) {
+            obj.setFog(fogDistance);
+        }
+    }
+
+    view.render = function render() {
+        g.renderView(view);
+        if (state.debugCameraWindow && debugCamera) {
+            const size = { x: 400, y: 400 };
+            debugCamera.aspect = size.x / size.y;
+            debugCamera.updateProjectionMatrix();
+            if (view.atmosphere) {
+                view.atmosphere.visible = false;
+            }
+            fogDistance = 10e10;
+            for (const obj of tileLayer.level0Nodes) {
+                obj.traverseVisible(tileDisplay);
+            }
+            helper.visible = true;
+            helper.updateMatrixWorld(true);
+            r.setViewport(g.width - size.x, 0, size.x, size.y);
+            r.clearDepth();
+            r.render(view.scene, debugCamera);
+            helper.visible = false;
+            if (view.atmosphere) {
+                view.atmosphere.visible = true;
+            }
+            fogDistance = view.fogDistance;
+            for (const obj of tileLayer.level0Nodes) {
+                obj.traverseVisible(tileDisplay);
+            }
+        }
     };
 }
 
