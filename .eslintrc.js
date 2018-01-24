@@ -1,3 +1,5 @@
+const dev = process.env.NODE_ENV === 'development' ? 'warn' : 'error';
+
 module.exports = {
  'extends': [
    'eslint-config-airbnb-base',
@@ -22,10 +24,13 @@ module.exports = {
     commonjs: true
   },
   rules: {
+    'no-trailing-spaces': dev,
+    'padded-blocks' : dev,
+    'no-unused-vars': dev,
     'no-plusplus': 'off',
     // this option sets a specific tab width for your code
     // http://eslint.org/docs/rules/indent
-    indent: ['error', 4, {
+    indent: [dev, 4, {
       SwitchCase: 1,
       VariableDeclarator: 1,
       outerIIFEBody: 1,
