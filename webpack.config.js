@@ -25,6 +25,11 @@ module.exports = {
         libraryTarget: 'umd',
         umdNamedDefine: true,
     },
+    resolve: {
+        alias: {
+            'three-extras': path.resolve(__dirname, 'node_modules/three/examples/js/'),
+        },
+    },
     plugins: [
         definePlugin,
         providePlugin,
@@ -54,7 +59,7 @@ module.exports = {
                 // .babelrc is used for transpiling src/ into lib/ in the prepublish
                 // phase, see package.json
                 options: {
-                    presets: [['es2015', { modules: false } ]],
+                    presets: [['es2015', { modules: false }]],
                     plugins: ['transform-runtime'],
                     babelrc: false,
                 },

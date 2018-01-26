@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import GLTFLoader from './GLTFLoader';
+/* eslint-disable */
+import GLTFLoader from 'imports-loader?THREE=three!exports-loader?THREE.GLTFLoader!three-extras/loaders/GLTFLoader';
+import LegacyGLTFLoader from 'imports-loader?THREE=three!exports-loader?THREE.LegacyGLTFLoader!three-extras/loaders/deprecated/LegacyGLTFLoader';
+/* eslint-enable */
 import BatchTable from './BatchTable';
 
 const matrixChangeUpVectorZtoY = (new THREE.Matrix4()).makeRotationX(Math.PI / 2);
@@ -8,6 +11,7 @@ const matrixChangeUpVectorZtoX = (new THREE.Matrix4()).makeRotationZ(-Math.PI / 
 
 function B3dmLoader() {
     this.glTFLoader = new GLTFLoader();
+    this.LegacyGLTFLoader = new LegacyGLTFLoader();
 }
 
 function filterUnsupportedSemantics(obj) {
@@ -104,9 +108,18 @@ B3dmLoader.prototype.parse = function parse(buffer, gltfUpAxis, textDecoder) {
                 const b3dm = { gltf, batchTable };
                 resolve(b3dm);
             };
-            this.glTFLoader.parse(buffer.slice(28 + b3dmHeader.FTJSONLength +
-                b3dmHeader.FTBinaryLength + b3dmHeader.BTJSONLength +
-                b3dmHeader.BTBinaryLength), onload);
+
+            const gltf = buffer.slice(28 + b3dmHeader.FTJSONLength +
+                    b3dmHeader.FTBinaryLength + b3dmHeader.BTJSONLength +
+                    b3dmHeader.BTBinaryLength);
+
+            const onError = (ex) => {
+                // eslint-disable-next-line no-console
+                console.error('Failed to parse GLTF, use LegacyGLTFLoader', ex);
+                this.LegacyGLTFLoader.parse(gltf, onload);
+            };
+
+            this.glTFLoader.parse(gltf, undefined, onload, onError);
         });
     } else {
         throw new Error('Invalid b3dm file.');
