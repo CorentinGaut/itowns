@@ -87,7 +87,8 @@ function extractFeature(coordinates, properties, id) {
     const featureVertices = coordinates.featureVertices[id];
     const contour = coordinates.coordinates.slice(featureVertices.offset, featureVertices.offset + featureVertices.count);
     const property = properties[id].properties;
-    return { contour, property };
+    const extent = featureVertices.extent;
+    return { contour, property, extent };
 }
 
 /*
@@ -184,14 +185,15 @@ function coordinateToPolygon(coordinates, properties, options) {
     const indices = [];
     const vertices = new Float32Array(3 * coordinates.coordinates.length);
     const colors = new Uint8Array(3 * coordinates.coordinates.length);
-    const ids = new Float32Array(coordinates.coordinates.length);
+    const ids = new Uint32Array(coordinates.coordinates.length);
     const geometry = new THREE.BufferGeometry();
     let offset = 0;
     let minAltitude = Infinity;
+    geometry.extent = [];
     /* eslint-disable-next-line */
     for (const id in coordinates.featureVertices) {
         // extract contour coodinates and properties of one feature
-        const { contour, property } = extractFeature(coordinates, properties, id);
+        const { contour, property, extent } = extractFeature(coordinates, properties, id);
         // get altitude and extrude amount from properties
         const altitudeBottom = getAltitude(options, property, contour);
         minAltitude = Math.min(minAltitude, altitudeBottom);
@@ -208,10 +210,10 @@ function coordinateToPolygon(coordinates, properties, options) {
         const color = getColor(options, property);
         fillColorArray(colors, offset, contour.length, color.r * 255, color.g * 255, color.b * 255);
         // assign id to each point
-        const len = offset + length;
-        for (let i = offset; i < len; ++i) ids[i] = id;
+        for (let i = 0; i < contour.length; ++i) ids[offset + i] = id;
         // increment offset
         offset += contour.length;
+        geometry.extent[id] = extent;
     }
 
     geometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));

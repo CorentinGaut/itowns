@@ -68,7 +68,7 @@ export function reasonnableEpsilonForUnit(unit) {
 function _crsToUnitWithError(crs) {
     const u = crsToUnit(crs);
     if (crs === undefined || u === undefined) {
-        throw new Error(`Invalid crs paramater value '${crs}'`);
+        throw new Error(`Invalid crs parameter value '${crs}'`);
     }
     return u;
 }

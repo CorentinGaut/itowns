@@ -39,7 +39,12 @@ function readCoordinates(crsIn, crsOut, coordinates, extent) {
         }
         // expand extent if present
         if (extent) {
-            extent.expandByPoint(out[out.length - 1]);
+            if (extent._crs === crsIn) {
+                // prevent crsOut -> crsIn reprojection
+                extent.expandByPoint(coords);
+            } else {
+                extent.expandByPoint(out[out.length - 1]);
+            }
         }
     }
     return out;
@@ -52,7 +57,7 @@ function readCoordinates(crsIn, crsOut, coordinates, extent) {
 // Multi-* geometry types are merged in one.
 const GeometryToCoordinates = {
     point(crsIn, crsOut, coordsIn, filteringExtent, options) {
-        const extent = options.buildExtent ? new Extent(crsOut, Infinity, -Infinity, Infinity, -Infinity) : undefined;
+        const extent = options.crsExtent ? new Extent(options.crsExtent, Infinity, -Infinity, Infinity, -Infinity) : undefined;
         let coordinates = readCoordinates(crsIn, crsOut, coordsIn, extent);
         if (filteringExtent) {
             coordinates = coordinates.filter(c => filteringExtent.isPointInside(c));
@@ -60,7 +65,7 @@ const GeometryToCoordinates = {
         return { type: 'point', coordinates, extent };
     },
     polygon(crsIn, crsOut, coordsIn, filteringExtent, options) {
-        const extent = options.buildExtent ? new Extent(crsOut, Infinity, -Infinity, Infinity, -Infinity) : undefined;
+        const extent = options.crsExtent ? new Extent(options.crsExtent, Infinity, -Infinity, Infinity, -Infinity) : undefined;
         const coordinates = readCoordinates(crsIn, crsOut, coordsIn, extent);
         if (filteringExtent && !filteringExtent.isPointInside(coordinates[0])) {
             return;
@@ -68,7 +73,7 @@ const GeometryToCoordinates = {
         return { type: 'polygon', coordinates, extent };
     },
     lineString(crsIn, crsOut, coordsIn, filteringExtent, options) {
-        const extent = options.buildExtent ? new Extent(crsOut, Infinity, -Infinity, Infinity, -Infinity) : undefined;
+        const extent = options.crsExtent ? new Extent(options.crsExtent, Infinity, -Infinity, Infinity, -Infinity) : undefined;
         const coordinates = readCoordinates(crsIn, crsOut, coordsIn, extent);
         if (filteringExtent && !filteringExtent.isPointInside(coordinates[0])) {
             return;
@@ -231,6 +236,11 @@ function readFeatureCollection(crsIn, crsOut, json, filteringExtent, options) {
 export default {
     parse(crsOut, json, filteringExtent, options = {}) {
         options.crsIn = options.crsIn || readCRS(json);
+        if (options.crsExtent == 'in') {
+            options.crsExtent = options.crsIn;
+        } else if (options.crsExtent == 'out') {
+            options.crsExtent = crsOut;
+        }
         switch (json.type.toLowerCase()) {
             case 'featurecollection':
                 return readFeatureCollection(options.crsIn, crsOut, json, filteringExtent, options);

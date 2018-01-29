@@ -116,7 +116,7 @@ export default {
                 // It shouldn't use parent's texture outside the extent
                 // Otherwise artefacts appear at the outer edge
                 layer.noTextureParentOutsideLimit = true;
-                const options = { buildExtent: true, crsIn: layer.projection };
+                const options = { crsExtent: 'out', crsIn: layer.projection };
 
                 if (layer.options.mimetype === 'vector/geojson') {
                     layer.feature = GeoJSON2Features.parse(layer.reprojection, file, layer.extent, options);
