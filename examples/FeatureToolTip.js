@@ -1,6 +1,6 @@
 /* global itowns, document */
 // eslint-disable-next-line no-unused-vars
-function ToolTip(viewer, viewerDiv, tooltip, precisionPx) {
+function ToolTip(viewer, viewerDiv, tooltip, precisionPx, clickCallback) {
     var mouseDown = 0;
     var layers = viewer.getLayers(function _(l) { return l.protocol === 'rasterizer'; });
 
@@ -19,14 +19,13 @@ function ToolTip(viewer, viewerDiv, tooltip, precisionPx) {
         var id = 0;
         var layer;
         var result;
-        var polygon;
+        var properties;
         var color;
         var stroke;
         var name;
         var symb;
         var label;
-        var line;
-        var point;
+        var coordinates;
         // var
         tooltip.innerHTML = '';
         tooltip.style.visibility = 'hidden';
@@ -40,32 +39,30 @@ function ToolTip(viewer, viewerDiv, tooltip, precisionPx) {
                 result.sort(function compare(a, b) { return b.type !== 'point'; });
                 for (p = 0; p < result.length; p++) {
                     visible = true;
+                    properties = result[p].properties;
+                    ++id;
+                    name = 'tooltip_'  + id;
+                    label = properties.name|| properties.title || properties.nom || properties.description || layer.name;
                     if (result[p].type === 'polygon') {
-                        polygon = result[p];
-                        color = polygon.properties.fill || layer.style.fill;
-                        stroke = polygon.properties.stroke || layer.style.stroke;
-                        name = 'polygon' + id;
+                        color = properties.fill || layer.style.fill;
+                        stroke = properties.stroke || layer.style.stroke;
                         symb = '<span id=' + name + ' >&#9724</span>';
-                        tooltip.innerHTML += symb + ' ' + (polygon.properties.name || polygon.properties.nom || polygon.properties.description || layer.name) + '<br />';
+                        img = properties.thumbnail ? '<img src="' + properties.thumbnail + '" height="256px"/><br />' : "";
+                        tooltip.innerHTML += symb + ' ' + label + '<br />' + img;
                         document.getElementById(name).style['-webkit-text-stroke'] = '1.25px ' + stroke;
                         document.getElementById(name).style.color = color;
-                        ++id;
                     } else if (result[p].type === 'linestring') {
-                        line = result[p];
-                        color = line.properties.stroke || layer.style.stroke;
-                        symb = '<span style=color:' + color + ';>&#9473</span>';
-                        tooltip.innerHTML += symb + ' ' + (line.name || layer.name) + '<br />';
+                        color = properties.stroke || layer.style.stroke;
+                        symb = '<span id=' + name + ' style=color:' + color + ';>&#9473</span>';
+                        tooltip.innerHTML += symb + ' ' + label + '<br />';
                     } else if (result[p].type === 'point') {
-                        point = result[p];
+                        coordinates = result[p].coordinates;
                         color = 'white';
-                        name = 'point' + id;
                         symb = '<span id=' + name + ' style=color:' + color + ';>&#9679</span>';
-                        label = point.properties.name || point.properties.description || layer.name;
                         tooltip.innerHTML += '<div>' + symb + ' ' + label + '<br></div>';
-                        tooltip.innerHTML += '<span class=coord>long ' + point.coordinates.longitude().toFixed(4) + '<br /></span>';
-                        tooltip.innerHTML += '<span class=coord>lati &nbsp; ' + point.coordinates.latitude().toFixed(4) + '<br /></span>';
+                        tooltip.innerHTML += '<span class=coord>long ' + coordinates.longitude().toFixed(4) + '<br /></span>';
+                        tooltip.innerHTML += '<span class=coord>lati &nbsp; ' + coordinates.latitude().toFixed(4) + '<br /></span>';
                         document.getElementById(name).style['-webkit-text-stroke'] = '1px red';
-                        ++id;
                     }
                 }
             }
@@ -87,10 +84,28 @@ function ToolTip(viewer, viewerDiv, tooltip, precisionPx) {
     }
 
     function pickPosition(e) {
-        buildToolTip(viewer.controls.pickGeoPosition(e.clientX, e.clientY), e);
+  //      buildToolTip(viewer.controls.pickGeoPosition(e.clientX, e.clientY), e);
+    }
+
+    function clickPosition(e) {
+        var geoCoord = viewer.controls.pickGeoPosition(e.clientX, e.clientY);
+        var layer, result;
+        if (clickCallback && geoCoord) {
+            var precision = viewer.controls.pixelsToDegrees(precisionPx || 5);
+            for (i = 0; i < layers.length; i++) {
+                layer = layers[i];
+                result = itowns.FeaturesUtils.filterFeaturesUnderCoordinate(
+                    geoCoord, layer.feature, precision);
+                result.sort(function compare(a, b) { return b.type !== 'point'; });
+                for (p = 0; p < result.length; p++) {
+                    clickCallback(result[p]);
+                }
+            }
+        }
     }
 
     document.addEventListener('mousemove', readPosition, false);
     document.addEventListener('mousedown', pickPosition, false);
+    document.addEventListener('click', clickPosition, false);
 }
 

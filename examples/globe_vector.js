@@ -54,5 +54,19 @@ promises.push(globeView.addLayer({
     },
 }));
 
+promises.push(globeView.addLayer({
+    type: 'color',
+    url: 'https://finder.eocloud.eu/resto/api/collections/Sentinel1/search.json',
+    protocol: 'rasterizer',
+    options: { mimetype: 'vector/geojson', zoom: { min: 1, max: 21 } },
+    id: 'eocloud',
+    transparent: true,
+    style: {
+        fill: 'yellow',
+        fillOpacity: 0.5,
+        stroke: 'white',
+    },
+}));
+
 exports.view = globeView;
 exports.initialPosition = positionOnGlobe;

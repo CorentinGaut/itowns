@@ -74,8 +74,8 @@ export default {
         }
 
         const extention = getExtension(layer.url).toLowerCase();
-        const format = `vector/${extention}`;
         layer.options = layer.options || {};
+        const format = layer.options.mimetype || `vector/${extention}`;
 
         if (!supportedFormats.includes(format) && !layer.options.mimetype) {
             return Promise.reject(new Error('layer.options.mimetype is required'));

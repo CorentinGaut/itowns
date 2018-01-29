@@ -24,7 +24,7 @@ function selectBestImageForExtent(images, extent) {
 }
 
 function buildUrl(layer, image) {
-    return layer.url.href.substr(0, layer.url.href.lastIndexOf('/') + 1)
+    return layer.url.substr(0, layer.url.lastIndexOf('/') + 1)
         + image;
 }
 
@@ -75,6 +75,35 @@ function getTexture(tile, layer) {
 }
 
 
+function setMetaData(layer) {
+    return function __setMetaData(metadata) {
+        layer.images = [];
+        // eslint-disable-next-line guard-for-in
+        for (const image in metadata) {
+            const md = metadata[image];
+            const extent = (md instanceof Extent) ? md : new Extent(layer.projection, ...md);
+            layer.images.push({
+                image,
+                extent,
+            });
+        }
+        if (!layer.options.mimetype) {
+            // fetch the first image to detect mimetype
+            if (layer.images.length) {
+                const url = buildUrl(layer, layer.images[0].image);
+                return fetch(url, layer.networkOptions).then((response) => {
+                    layer.options.mimetype = response.headers.get('Content-type');
+                    if (layer.options.mimetype === 'application/octet-stream') {
+                        layer.options.mimetype = 'image/x-bil';
+                    }
+                    if (!layer.options.mimetype) {
+                        throw new Error('Could not detect layer\'s mimetype');
+                    }
+                });
+            }
+        }
+    };
+}
 /**
  * This provider uses no protocol but instead download static images directly.
  *
@@ -82,6 +111,7 @@ function getTexture(tile, layer) {
  * for a given tile using the extent property.
  */
 export default {
+
     preprocessDataLayer(layer) {
         if (!layer.extent) {
             throw new Error('layer.extent is required');
@@ -93,34 +123,17 @@ export default {
 
         layer.options = layer.options || {};
         layer.canTileTextureBeImproved = this.canTileTextureBeImproved;
-        layer.url = new URL(layer.url, window.location);
-        return Fetcher.json(layer.url.href).then((metadata) => {
-            layer.images = [];
-            // eslint-disable-next-line guard-for-in
-            for (const image in metadata) {
-                const extent = new Extent(layer.projection, ...metadata[image]);
-                layer.images.push({
-                    image,
-                    extent,
-                });
-            }
-        }).then(() => {
-            if (!layer.options.mimetype) {
-                // fetch the first image to detect mimetype
-                if (layer.images.length) {
-                    const url = buildUrl(layer, layer.images[0].image);
-                    return fetch(url, layer.networkOptions).then((response) => {
-                        layer.options.mimetype = response.headers.get('Content-type');
-                        if (layer.options.mimetype === 'application/octet-stream') {
-                            layer.options.mimetype = 'image/x-bil';
-                        }
-                        if (!layer.options.mimetype) {
-                            throw new Error('Could not detect layer\'s mimetype');
-                        }
-                    });
-                }
-            }
-        });
+        layer.setMetaData = setMetaData(layer);
+
+        if (layer.url) {
+            layer.url = new URL(layer.url, window.location).href;
+            return Fetcher.json(layer.url).then(layer.setMetaData);
+        } else if (layer.metadata) {
+            layer.url = '';
+            return layer.setMetaData(layer.metadata);
+        } else {
+            throw new Error('layer.url or layer.metadata is required');
+        }
     },
 
     tileInsideLimit(tile, layer) {

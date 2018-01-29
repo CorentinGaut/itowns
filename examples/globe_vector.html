@@ -78,6 +78,28 @@
 
             menuGlobe.view = globeView;
             // Listen for globe full initialisation event
+            var projection = 'EPSG:4326';
+            var static_layer;
+            promises.push(globeView.addLayer({
+                type: 'color',
+                protocol: 'static',
+                metadata: {},
+                networkOptions: { crossOrigin: 'anonymous' },
+                options: {mimetype: 'image/png', zoom: { min: 1, max: 21 } },
+                id: 'static',
+                projection,
+            }).then(layer => { static_layer = layer; }));
+            
+            function clickCallback(feature) {
+                var metadata = {};
+                var extent = new itowns.Extent(projection, Infinity, -Infinity, Infinity, -Infinity);
+                for(var i=0; i<feature.coordinates.length; ++i)
+                {
+                    extent.expandByPoint(feature.coordinates[i]);
+                }
+                metadata[feature.properties.thumbnail] = [extent._values[0],extent._values[1],extent._values[2],extent._values[3]];
+                static_layer.setMetaData(metadata);
+            }
 
             globeView.addEventListener(itowns.GLOBE_VIEW_EVENTS.GLOBE_INITIALIZED, function () {
                 // eslint-disable-next-line no-console
@@ -87,7 +109,7 @@
                     menuGlobe.addElevationLayersGUI(globeView.getLayers(function (l) { return l.type === 'elevation'; }));
                     itowns.ColorLayersOrdering.moveLayerToIndex(globeView, 'Ortho', 0);
 
-                    new ToolTip(globeView, document.getElementById('viewerDiv'), document.getElementById('tooltipDiv'));
+                    new ToolTip(globeView, document.getElementById('viewerDiv'), document.getElementById('tooltipDiv'), 5, clickCallback);
                 });
 
 
