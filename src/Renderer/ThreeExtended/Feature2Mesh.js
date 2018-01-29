@@ -140,7 +140,7 @@ function coordinateToPoints(coordinates, properties, options) {
     }
     geometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
     geometry.addAttribute('color', new THREE.BufferAttribute(colors, 3, true));
-    return new THREE.Points(geometry);
+    return new THREE.Points(geometry, options.material);
 }
 
 function coordinateToLines(coordinates, properties, options) {
@@ -177,13 +177,14 @@ function coordinateToLines(coordinates, properties, options) {
     geometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
     geometry.addAttribute('color', new THREE.BufferAttribute(colors, 3, true));
     geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
-    return new THREE.LineSegments(geometry);
+    return new THREE.LineSegments(geometry, options.material);
 }
 
 function coordinateToPolygon(coordinates, properties, options) {
     const indices = [];
     const vertices = new Float32Array(3 * coordinates.coordinates.length);
     const colors = new Uint8Array(3 * coordinates.coordinates.length);
+    const ids = new Float32Array(coordinates.coordinates.length);
     const geometry = new THREE.BufferGeometry();
     let offset = 0;
     let minAltitude = Infinity;
@@ -206,14 +207,18 @@ function coordinateToPolygon(coordinates, properties, options) {
         // assign color to each point
         const color = getColor(options, property);
         fillColorArray(colors, offset, contour.length, color.r * 255, color.g * 255, color.b * 255);
+        // assign id to each point
+        const len = offset + length;
+        for (let i = offset; i < len; ++i) ids[i] = id;
         // increment offset
         offset += contour.length;
     }
 
     geometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
     geometry.addAttribute('color', new THREE.BufferAttribute(colors, 3, true));
+    geometry.addAttribute('id', new THREE.BufferAttribute(ids, 1));
     geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(indices), 1));
-    return new THREE.Mesh(geometry);
+    return new THREE.Mesh(geometry, options.material);
 }
 
 function coordinateToPolygonExtruded(coordinates, properties, options) {
@@ -260,7 +265,7 @@ function coordinateToPolygonExtruded(coordinates, properties, options) {
     geometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
     geometry.addAttribute('color', new THREE.BufferAttribute(colors, 3, true));
     geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(indices), 1));
-    const result = new THREE.Mesh(geometry);
+    const result = new THREE.Mesh(geometry, options.material);
     result.minAltitude = minAltitude;
     return result;
 }
@@ -281,7 +286,7 @@ function coordinatesToMesh(coordinates, properties, options) {
         return;
     }
     var mesh;
-    switch (coordinates.type) {
+    switch (options.type || coordinates.type) {
         case 'point': {
             mesh = coordinateToPoints(coordinates, properties, options);
             break;
@@ -303,8 +308,11 @@ function coordinatesToMesh(coordinates, properties, options) {
     }
 
     // set mesh material
-    mesh.material.vertexColors = THREE.VertexColors;
-    mesh.material.color = new THREE.Color(0xffffff);
+    if (!options.material)
+    {
+        mesh.material.vertexColors = options.vertexColors || THREE.VertexColors;
+        mesh.material.color = options.color || new THREE.Color(0xffffff);
+    }
     return mesh;
 }
 
