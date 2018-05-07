@@ -101,4 +101,19 @@ export default {
             return response.arrayBuffer();
         });
     },
+
+    /**
+     * Wrapper over fetch to get some Blob
+     *
+     * @param {string} url
+     * @param {Object} options - fetch options (passed directly to fetch)
+     *
+     * @return {Promise}
+     */
+    blob(url, options = {}) {
+        return fetch(url, options).then((response) => {
+            checkResponse(response);
+            return response.blob();
+        });
+    },
 };

@@ -9,7 +9,7 @@ function readFile(file, type) {
         if (type === 'arrayBuffer') {
             fr.readAsArrayBuffer(file);
         } else {
-            fr.readAsBinaryString(file);
+            fr.readAsText(file);
         }
     });
 }
@@ -54,8 +54,6 @@ export default {
                 assignLayer(obj.object3d, layer);
                 view.camera.camera3D.layers.enable(layer.threejsLayer);
                 view.notifyChange(true);
-            } else {
-                console.warn(obj, ' has no object3d key');
             }
             return obj;
         }

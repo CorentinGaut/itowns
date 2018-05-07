@@ -39,33 +39,141 @@
             // Instanciate iTowns GlobeView*
             var globeView = new itowns.GlobeView(viewerDiv, positionOnGlobe);
 
-            var promises = [];
-
             setupLoadingScreen(viewerDiv, globeView);
 
             function addLayerCb(layer) {
                 return globeView.addLayer(layer);
             }
-            promises.push(itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then(addLayerCb));
-            promises.push(itowns.Fetcher.json('./layers/JSONLayers/WORLD_DTM.json').then(addLayerCb));
-            promises.push(itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json').then(addLayerCb));
+            itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then(addLayerCb);
+            itowns.Fetcher.json('./layers/JSONLayers/WORLD_DTM.json').then(addLayerCb);
+            itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json').then(addLayerCb);
 
             function addFiles(event, dataTransfer) {
+                event.stopPropagation();
                 event.preventDefault();
                 var files = dataTransfer.files;
-                for (var i = 0; i < files.length; i++) {
-                    var file = files[i];
-                    console.log(file);
-                    globeView.addLayer({ protocol: 'file', file, id: file.name, options: { event, altitude: 500} });
+                var addLayer = function(file, name) {
+                    name = name || file.name;
+                    console.log('addLayer', name);
+                    globeView.addLayer({
+                        protocol: 'file',
+                        file,
+                        format: 'micmac/orientation',
+                        id: name,
+                        convert: function(camera) {
+                            camera.check && camera.check(1e-6);
+                            console.log(camera.check ? 'tested' : 'notest', name, camera);
+                        },
+                        options: {
+                            fetch: function(url) {
+                                url = url.substr(url.lastIndexOf('/') + 1);
+                                for(file of files) {
+                                    if (file.name === url) return new Promise((resolve, reject) => {
+                                        var fr = new FileReader();
+                                        fr.onload = () => { resolve(fr.result); };
+                                        fr.onerror = () => { fr.abort(); reject(new DOMException('FileReader error.')); };
+                                        fr.readAsText(file);
+                                    });
+                                }
+                                return Promise.resolve(undefined);
+                            },
+                            path: 'https://raw.githubusercontent.com/micmacIGN/Documentation/master/FilesSamples/'
+                        }
+                    });
                 }
+                for(var i=0;i<files.length;i++)
+                    addLayer(files[i]);
+
+                if(files.length === 0) dataTransfer.getData('Text').split('\n').forEach(url =>
+                    itowns.Fetcher.blob(url).then(blob => addLayer(blob, url))
+                );
             }
 
             function prevDefault(event){ event.preventDefault(); }
             viewerDiv.addEventListener('dragenter', prevDefault, false);
             viewerDiv.addEventListener('dragover', prevDefault, false);
             viewerDiv.addEventListener('dragleave', prevDefault, false);
-            viewerDiv.addEventListener('drop',  function(e) { addFiles(e, e.dataTransfer); }, false);
-            viewerDiv.addEventListener('paste', function(e) { addFiles(e, e.clipboardData); }, false);
+            viewerDiv.addEventListener('drop',  function(e) { addFiles(e, e.dataTransfer || window.dataTransfer); }, false);
+            document.addEventListener('paste', function(e) { addFiles(e, e.clipboardData || window.clipboardData); }, false);
+
+            function test(path, image, options) {
+                options = options || {};
+                options.path = options.path || path;
+                options.fetchOptions = options.fetchOptions || { "crossOrigin" : "anonymous" };
+                options.fetch = options.fetch || (url => itowns.Fetcher.xml(url, options.fetchOptions));
+                var parser = globeView.mainLoop.scheduler.getFormatParser('micmac/orientation');
+                itowns.Fetcher.xml(options.path + image, options.fetchOptions)
+                .then(xml => parser.parse(xml, options))
+                .then(camera => camera.check ? camera.check(1e-6) : camera)
+                .then(camera => console.log(camera.check ? 'tested' : 'notest', image, camera));
+            }
+
+            var path;
+
+            path = 'https://raw.githubusercontent.com/micmacIGN/Documentation/master/FilesSamples/';
+            test(path, 'TestOri-1.xml'); // no check
+            test(path, 'TestOri-2.xml'); // no check
+            test(path, 'Orientation-00.xml');
+            test(path, 'Orientation-1.xml');
+            test(path, 'OriFrancesco.xml'); // no check
+
+            path = 'https://raw.githubusercontent.com/micmacIGN/Documentation/master/NEW-DATA/CompensOnLine/';
+            test(path, 'Ori-Rel/Orientation-Abbey-IMG_0204.jpg.xml');
+            test(path, 'Ori-Rel/Orientation-Abbey-IMG_0205.jpg.xml');
+            test(path, 'Ori-Rel/Orientation-Abbey-IMG_0206.jpg.xml');
+            test(path, 'Ori-Rel/Orientation-Abbey-IMG_0207.jpg.xml');
+            test(path, 'Ori-SmallPerturb/Orientation-Abbey-IMG_0204.jpg.xml');
+            test(path, 'Ori-SmallPerturb/Orientation-Abbey-IMG_0205.jpg.xml');
+            test(path, 'Ori-SmallPerturb/Orientation-Abbey-IMG_0206.jpg.xml');
+            test(path, 'Ori-SmallPerturb/Orientation-Abbey-IMG_0207.jpg.xml');
+            test(path, 'Ori-BigPerturb/Orientation-Abbey-IMG_0204.jpg.xml'); // check is failing !
+            test(path, 'Ori-BigPerturb/Orientation-Abbey-IMG_0205.jpg.xml');
+            test(path, 'Ori-BigPerturb/Orientation-Abbey-IMG_0206.jpg.xml');
+            test(path, 'Ori-BigPerturb/Orientation-Abbey-IMG_0207.jpg.xml'); // check is failing !
+
+            path = 'https://raw.githubusercontent.com/micmacIGN/Documentation/master/NEW-DATA/WPK/';
+            test(path, 'Orientation-IMG_6714.JPG.xml'); // no check
+
+            path = 'http://localhost/mbredif/data/micmac/Cuxa/'
+            test(path, 'Ori-All-Rel/Orientation-Abbey-IMG_0173.jpg.xml');
+            test(path, 'Ori-All-Rel/Orientation-Abbey-IMG_0194.jpg.xml');
+            test(path, 'Ori-All-Rel/Orientation-Abbey-IMG_0248.jpg.xml');
+            test(path, 'Ori-All-Rel/Orientation-Abbey-IMG_0284.jpg.xml');
+            test(path, 'Ori-All-Rel/Orientation-Abbey-IMG_0341.jpg.xml');
+
+            path = 'http://localhost/mbredif/data/micmac/Ramses/';
+            test(path, 'Ori-RadialBasic/Orientation-IMG_0350.jpg.xml');
+            test(path, 'Ori-RadialBasic/Orientation-IMG_0353.jpg.xml');
+            test(path, 'Ori-RadialBasic/Orientation-IMG_0354.jpg.xml');
+            test(path, 'Ori-RadialBasic/Orientation-IMG_0355.jpg.xml');
+            test(path, 'Ori-RadialBasic/Orientation-IMG_0356.jpg.xml');
+            test(path, 'Ori-RadialBasic/Orientation-IMG_0357.jpg.xml');
+            test(path, 'Ori-RadialBasic/Orientation-IMG_0359.jpg.xml');
+
+            path = 'http://localhost/mbredif/data/micmac/Viabon/';
+            test(path, 'Ori-GPS/Orientation-image_002_00055.tif.xml'); // no check
+            test(path, 'Ori-GPS/Orientation-image_002_00065.tif.xml'); // no check
+            test(path, 'Ori-GPS/Orientation-image_002_00075.tif.xml'); // no check
+            test(path, 'Ori-GPS/Orientation-image_002_00085.tif.xml'); // no check
+            test(path, 'Ori-GPS/Orientation-image_002_00095.tif.xml'); // no check
+            test(path, 'Ori-GPS/Orientation-image_002_00105.tif.xml'); // no check
+            test(path, 'Ori-GPS/Orientation-image_002_00115.tif.xml'); // no check
+            test(path, 'Ori-GPS/Orientation-image_002_00125.tif.xml'); // no check
+            test(path, 'Ori-FraserBasic/Orientation-image_002_00055.tif.xml');
+            test(path, 'Ori-FraserBasic/Orientation-image_002_00065.tif.xml');
+            test(path, 'Ori-FraserBasic/Orientation-image_002_00075.tif.xml');
+            test(path, 'Ori-FraserBasic/Orientation-image_002_00085.tif.xml');
+            test(path, 'Ori-FraserBasic/Orientation-image_002_00095.tif.xml');
+            test(path, 'Ori-FraserBasic/Orientation-image_002_00105.tif.xml');
+            test(path, 'Ori-FraserBasic/Orientation-image_002_00115.tif.xml');
+            test(path, 'Ori-FraserBasic/Orientation-image_002_00125.tif.xml');
+
+            path = 'http://localhost/mbredif/data/micmac/DemoScanned/';
+            test(path, 'Ori-Ori2/Orientation-IMG_5693_Out.jpg.xml');
+            test(path, 'Ori-Ori2/Orientation-IMG_5694_Out.jpg.xml');
+            test(path, 'Ori-Ori2/Orientation-IMG_5695_Out.jpg.xml');
+            test(path, 'Ori-Ori2/Orientation-IMG_5696_Out.jpg.xml');
+            test(path, 'Ori-Ori2/Orientation-IMG_5697_Out.jpg.xml');
 
         </script>
     </body>

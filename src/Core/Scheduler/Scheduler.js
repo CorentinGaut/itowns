@@ -24,6 +24,7 @@ import GpxParser from '../../Parser/GpxParser';
 import PntsParser from '../../Parser/PntsParser';
 import PotreeBinParser from '../../Parser/PotreeBinParser';
 import PotreeCinParser from '../../Parser/PotreeCinParser';
+import MicmacOrientationParser from '../../Parser/MicmacOrientationParser';
 
 var instanceScheduler = null;
 
@@ -125,6 +126,7 @@ Scheduler.prototype.initDefaultParsers = function initDefaultParsers() {
     this.addFormatParser(PntsParser);
     this.addFormatParser(PotreeBinParser);
     this.addFormatParser(PotreeCinParser);
+    this.addFormatParser(MicmacOrientationParser);
 };
 
 Scheduler.prototype.runCommand = function runCommand(command, queue, executingCounterUpToDate) {

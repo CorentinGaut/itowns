@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>MICMAC</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+        <style>
+            #help {
+                text-align:center;
+                margin-top: 50vh;
+                transform: translateY(-50%);
+            }
+            ul {
+                list-style-type: none;
+            }
+            body {
+                background-color: #000000;
+                margin: 0px;
+                overflow: hidden;
+                color: white;
+            }
+        </style>
+    </head>
+    <body>
+        <div id='help'> Drag and drop some Micmac files here :
+            <ul>
+                <li>Orientation*.xml</li>
+                <li>AutoCal*.xml</li>
+                <li>AperiCloud*.ply</li>
+            </ul>
+        </div>
+        <script src="../dist/itowns.js"></script>
+        <script>
+            var THREE = itowns.THREE;
+        </script>
+        <script src="https://unpkg.com/three@0.89.0/examples/js/loaders/PLYLoader.js"></script>
+        <script src="https://unpkg.com/three@0.89.0/examples/js/controls/OrbitControls.js"></script>
+        <script>
+            var container;
+
+            var camera, cameraTarget, scene, renderer, controls, micmac;
+
+            init();
+            animate();
+
+            function init() {
+
+                container = document.createElement( 'div' );
+                document.body.appendChild( container );
+
+                camera = new THREE.PerspectiveCamera( 35, window.innerWidth / window.innerHeight, 0.1, 1000 );
+                camera.up = new THREE.Vector3(0, 0, 1);
+
+                scene = new THREE.Scene();
+                micmac = new THREE.Group();
+                scene.add(micmac);
+
+
+                // renderer
+
+                renderer = new THREE.WebGLRenderer( { antialias: true } );
+                renderer.setPixelRatio( window.devicePixelRatio );
+                renderer.setSize( window.innerWidth, window.innerHeight );
+
+                container.appendChild( renderer.domElement );
+
+                // resize
+
+                window.addEventListener( 'resize', onWindowResize, false );
+
+                // controls
+                controls = new THREE.OrbitControls( camera, renderer.domElement );
+                //controls.addEventListener( 'change', render ); // call this only in static scenes (i.e., if there is no animation loop)
+                controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
+                controls.dampingFactor = 0.25;
+                controls.screenSpacePanning = false;
+                controls.maxPolarAngle = Math.PI / 2;
+
+                // PLY file
+                var plyParser = new THREE.PLYLoader();
+                var handlePly = function(name) {
+                    return function(geometry) {
+                        console.log(name);
+                        var material = new THREE.PointsMaterial( { color: 0x0055ff, sizeAttenuation: false } );
+                        var mesh = new THREE.Points( geometry, material );
+                        micmac.add( mesh );
+                    };
+                };
+                var loadPly = function(url) { plyParser.load( url, handlePly(url) ); };
+
+                var sum = new THREE.Vector3(0, 0, 0);
+                var Nsum = 0;
+                var wireframe = true;
+                function cameraMesh(camera) {
+                    // create the group located at the camera frame.
+                    var group = new THREE.Group();
+                    camera.matrixWorld.decompose(group.position, group.quaternion, group.scale);
+                    group.updateMatrix();
+
+                    // place a frustum
+                    {
+                        var m = camera.projectionMatrixInverse;
+                        var w = camera.size[0];
+                        var h = camera.size[1];
+                        var geometry = new THREE.Geometry();
+                        geometry.vertices.push(
+                            new THREE.Vector3( 0, 0, 0 ),
+                            new THREE.Vector3( 0, 0, 1 ).applyMatrix4(m),
+                            new THREE.Vector3( 0, h, 1 ).applyMatrix4(m),
+                            new THREE.Vector3( w, h, 1 ).applyMatrix4(m),
+                            new THREE.Vector3( w, 0, 1 ).applyMatrix4(m)
+                        );
+                        // 4 sides
+                        geometry.faces.push( new THREE.Face3( 0, 1, 2 ) );
+                        geometry.faces.push( new THREE.Face3( 0, 2, 3 ) );
+                        geometry.faces.push( new THREE.Face3( 0, 3, 4 ) );
+                        geometry.faces.push( new THREE.Face3( 0, 4, 1 ) );
+
+                        // 1 quad
+                        if (!wireframe) {
+                            geometry.faces.push( new THREE.Face3( 1, 3, 2 ) );
+                            geometry.faces.push( new THREE.Face3( 3, 1, 4 ) );
+                        }
+
+                        geometry.computeBoundingSphere();
+                        var material = new THREE.MeshBasicMaterial( {color: 0x00ffff, wireframe} );
+                        group.add(new THREE.Mesh( geometry, material ));
+                    }
+
+                    // place a sphere at the camera center
+                    {
+                        var geometry = new THREE.SphereBufferGeometry(0.05, 8, 8 );
+                        var material = new THREE.MeshBasicMaterial( {color: 0xffff00} );
+                        group.add(new THREE.Mesh( geometry, material ));
+                    }
+
+                    // target the average of all camera centers
+                    sum.add(group.position);
+                    Nsum++;
+                    controls.target.copy(sum).divideScalar(Nsum);
+                    controls.object.position.copy(controls.target).add(new THREE.Vector3(10,10,10));
+                    controls.saveState();
+                    return group;
+                };
+
+                function handleOrientation(name) {
+                    return function(camera) {
+                        if (!camera) return;
+                        var check = '[?]';
+                        if (camera.check) check = camera.check() ? '[Y]' : '[N]';
+                        console.log(check, name, camera);
+                        scene.add( cameraMesh(camera) );
+                    };
+                }
+
+                var micmacParser = itowns.MicmacOrientationParser;
+                function addFiles(event, dataTransfer) {
+                    event.stopPropagation();
+                    event.preventDefault();
+
+
+                    // iterate over files
+                    var files = dataTransfer.files;
+                    for(var i=0;i<files.length;i++) {
+                        var read = function(file, type) {
+                            return new Promise((resolve, reject) => {
+                                var fr = new FileReader();
+                                fr.onload = () => { resolve(fr.result); };
+                                fr.onerror = () => { fr.abort(); reject(new DOMException('FileReader error.')); };
+                                switch(type) {
+                                    case 'text': fr.readAsText(file); break;
+                                    case 'arrayBuffer': fr.readAsArrayBuffer(file); break;
+                                    default: console.error('unknown response type', responseType);
+                                }
+                            });
+                        }
+                        var fetch = function(url, type) {
+                            url = url.substr(url.lastIndexOf('/') + 1);
+                            for(file of files) {
+                                if (file.name === url) return read(file, type);
+                            }
+                            return Promise.resolve(undefined);
+                        };
+                        var name = files[i].name;
+                        var ext = name.substr(name.lastIndexOf('.') + 1);
+                        switch (ext) {
+                            case 'ply':
+                                read(files[i], 'arrayBuffer')
+                                .then(ply => plyParser.parse(ply))
+                                .then(handlePly(name));
+                                break;
+                            case 'xml':
+                        var options = { fetch };
+                                read(files[i], 'text')
+                                .then(xml => micmacParser.parse(xml, options))
+                                .then(handleOrientation(name));
+                                break;
+                            default:
+                        }
+                    }
+                }
+
+                function prevDefault(event){
+                    document.getElementById( 'help' ).style.display = 'none';
+                    event.preventDefault();
+                }
+                document.addEventListener('dragenter', prevDefault, false);
+                document.addEventListener('dragover', prevDefault, false);
+                document.addEventListener('dragleave', prevDefault, false);
+                document.addEventListener('drop',  function(e) { addFiles(e, e.dataTransfer || window.dataTransfer); }, false);
+
+                function loadOrientation(path, name, options) {
+                    options = options || {};
+                    options.fetchOptions = options.fetchOptions || { "crossOrigin" : "anonymous" };
+                    options.fetch = options.fetch || (url => fetch(url, options.fetchOptions).then(response => response.text()));
+                    options.path = options.path || path;
+                    options.fetch(path + name)
+                        .then(xml => micmacParser.parse(xml, options))
+                        .then(handleOrientation(name));
+                }
+
+                function loadFileImSel(path, dir, options) {
+                    document.getElementById( 'help' ).style.display = 'none';
+                    options = options || {};
+                    options.fetchOptions = options.fetchOptions || { "crossOrigin" : "anonymous" };
+                    options.fetch = options.fetch || (url => fetch(url, options.fetchOptions).then(response => response.text()));
+                    var url = path+dir+'FileImSel.xml';
+                    options.fetch(url)
+                    .then(function (xml) {
+                        xml = new window.DOMParser().parseFromString(xml, 'text/xml');
+                        var names = Array.from(xml.getElementsByTagName('Name'));
+                        names.forEach(name => loadOrientation(path,dir+'Orientation-'+name.childNodes[0].nodeValue.trim()+'.xml', options));
+                    });
+                }
+
+                var base = './';
+                // loadPly(base + 'Maurepas/Exterieur/AperiCloud_MEP_Campari_v2.ply');
+                // loadOrientation(base + 'Maurepas/Exterieur/2-', 'Ori-MEP_MaurepasExt/Orientation-Maurepas_Ext_3E730.CR2.xml');
+                // loadOrientation(base + 'Maurepas/Exterieur/2-', 'Ori-MEP_MaurepasExt/Orientation-Maurepas_Ext_3E731.CR2.xml');
+                // loadFileImSel(base + 'Maurepas/Exterieur/2-', 'Ori-MEP_MaurepasExt/');
+                // loadFileImSel(base + 'Maurepas/Interieur/', 'Ori-MEP-Campari/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_FNE/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_FNO1/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_FNO2/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_FNO3/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_FSE/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_FSO/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_TDN/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_TDO/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_TE/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_TN/');
+                // loadFileImSel(base + 'Chambord/', 'Ori-MEP_TS/'); // no FileImSel.xml
+            }
+
+            function onWindowResize() {
+
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize( window.innerWidth, window.innerHeight );
+
+            }
+
+            function animate() {
+
+                requestAnimationFrame( animate );
+                controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
+                render();
+
+            }
+
+            function render() {
+                renderer.render( scene, camera );
+            }
+
+        </script>
+    </body>
+</html>
