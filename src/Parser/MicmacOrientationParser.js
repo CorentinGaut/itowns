@@ -7,28 +7,52 @@ function getText(xml, tagName) {
 
 function getNumbers(xml, tagName, value) {
     var text = getText(xml, tagName);
-    return text ? text.split(' ').map(Number) : value;
+    return text ? text.split(' ').filter(String).map(Number) : value;
 }
 
 function getChildNumbers(xml, tagName) {
     return Array.from(xml.getElementsByTagName(tagName)).map(node => Number(node.childNodes[0].nodeValue));
 }
 
-function projectRad(p) {
+// polynom with coefficients c evaluated at x using Horner's method
+function polynom(c, x) {
+    var res = c[c.length - 1];
+    for (var i = c.length - 2; i >= 0; --i) {
+        res = res * x + c[i];
+    }
+    return res;
+}
+
+// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L441-L475
+// WithFraser=false
+function projectRadial(p) {
     var x = p.x - this.C[0];
     var y = p.y - this.C[1];
     var r2 = x * x + y * y;
-    var poly = 0;
-    for (var i = this.R.length - 1; i >= 0; --i) {
-        poly = (poly + this.R[i]) * r2;
-    }
-    p.x += poly * x;
-    p.y += poly * y;
+    var radial = r2 * polynom(this.R, r2);
+    p.x += radial * x;
+    p.y += radial * y;
     return p;
 }
 
+// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L441-L475
+// WithFraser=true
+function projectFraser(p) {
+    var x = p.x - this.C[0];
+    var y = p.y - this.C[1];
+    var x2 = x * x;
+    var y2 = y * y;
+    var xy = x * y;
+    var r2 = x2 + y2;
+    var radial = r2 * polynom(this.R, r2);
+    p.x += radial * x + this.P[0] * (2 * x2 + r2) + this.P[1] * 2 * xy;
+    p.y += radial * y + this.P[1] * (2 * y2 + r2) + this.P[0] * 2 * xy;
+    p.x += this.b[0] * x + this.b[1] * y;
+    return p;
+}
+
+// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L361-L396
 function projectEbner(p) {
-    console.warn('Ebner distortion has never been tested');
     var x = p.x;
     var y = p.y;
     var x2 = x * x - this.B2;
@@ -43,8 +67,8 @@ function projectEbner(p) {
     return p;
 }
 
-function projectDCBrown(p) {
-    console.warn('DCBrown distortion has never been tested');
+// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L401-L439
+function projectBrown(p) {
     var x = p.x;
     var y = p.y;
     var x2 = x * x;
@@ -61,24 +85,8 @@ function projectDCBrown(p) {
     return p;
 }
 
-function projectPhgrStd(p) {
-    var x = p.x - this.C[0];
-    var y = p.y - this.C[1];
-    var x2 = x * x;
-    var y2 = y * y;
-    var xy = x * y;
-    var r2 = x2 + y2;
-    var poly = 0;
-    for (var i = this.R.length - 1; i >= 0; --i) {
-        poly = (poly + this.R[i]) * r2;
-    }
-    p.x += this.b[0] * x + this.b[1] * y;
-    p.x += poly * x + this.P[0] * (2 * x2 + r2) + this.P[1] * 2 * xy;
-    p.y += poly * y + this.P[1] * (2 * y2 + r2) + this.P[0] * 2 * xy;
-    return p;
-}
-
-function projectPolyDeg(p) {
+// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L527-L591
+function projectPolynom(p) {
     // Apply N normalization
     p.x = (p.x - this.C[0]) / this.S;
     p.y = (p.y - this.C[1]) / this.S;
@@ -88,13 +96,13 @@ function projectPolyDeg(p) {
     var y = p.y;
 
     // degree 2
-    var X = [x * x, y * x, y * y];
+    var X = [x * x, x * y, y * y];
     p.x += R[0] * x + R[1] * y + R[3] * X[1] - 2 * R[2] * X[0] + R[4] * X[2];
     p.y += R[1] * x - R[0] * y + R[2] * X[1] - 2 * R[3] * X[2] + R[5] * X[0];
 
     // degree 3+
     var i = 6;
-    for (var d = 3; d <= this.degree; ++d) {
+    for (var d = 3; i < R.length; ++d) {
         var j = i + d + 1;
         X[d] = y * X[d - 1];
         for (var l = 0; l < d; ++l) {
@@ -108,36 +116,69 @@ function projectPolyDeg(p) {
     }
 
     // Unapply N normalization
-    p.x = this.C[0] + p.x * this.S;
-    p.y = this.C[1] + p.y * this.S;
+    p.x = this.C[0] + this.S * p.x;
+    p.y = this.C[1] + this.S * p.y;
     return p;
 }
 
+// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L2169-L2352
 function projectFishEye(p) {
+    // Apply N normalization
     var A = (p.x - this.C[0]) / this.F;
     var B = (p.y - this.C[1]) / this.F;
-    var R2 = A * A + B * B;
-    var R = Math.sqrt(R2);
+    var R = Math.sqrt(A * A + B * B);
     var theta = Math.atan(R);
     if (this.equisolid) theta = 2 * Math.sin(0.5 * theta);
     var lambda = theta / R;
-    var a = lambda * A;
-    var b = lambda * B;
-    var r2 = lambda * lambda * R2;
-    var poly = 0;
-    for (var i = this.R.length - 1; i >= 0; --i) {
-        poly = (poly + this.R[i]) * r2;
+    var x = lambda * A;
+    var y = lambda * B;
+    var x2 = x * x;
+    var xy = x * y;
+    var y2 = y * y;
+    var r2 = x2 + y2;
+
+    // radial distortion and degree 1 polynomial
+    var radial = 1 + r2 * polynom(this.R, r2);
+    p.x = y * this.l[1] + x * (radial + this.l[0]);
+    p.y = x * this.l[1] + y * radial;
+
+    // tangential distortion
+    var rk = 1;
+    for (var k = 0; k < this.P.length; k += 2) {
+        var K = k + 2;
+        p.x += rk * ((r2 + K * x2) * this.P[k] + this.P[k + 1] * K * xy);
+        p.y += rk * ((r2 + K * y2) * this.P[k + 1] + this.P[k] * K * xy);
+        rk *= r2;
     }
-    ++poly;
-    var a2 = a * a;
-    var b2 = b * b;
-    var ab = a * b;
-    p.x = this.C[0] + this.F * (this.P[0] * (r2 + 2 * a2) + 2 * this.P[1] * ab + (poly + this.l[0]) * a + this.l[1] * b);
-    p.y = this.C[1] + this.F * (this.P[1] * (r2 + 2 * b2) + 2 * this.P[1] * ab + poly * b + this.l[1] * a);
+
+    // degree 3+ polynomial (no degree 2)
+    var X = [x2, xy, y2];
+    var j = 2;
+    for (var d = 3; j < this.l.length; ++d) {
+        X[d] = y * X[d - 1];
+        X[0] *= x;
+        p.y += this.l[j++] * X[0];
+        for (var l = 1; l < d; ++l) {
+            X[l] *= x;
+            p.x += this.l[j++] * X[l];
+            p.y += this.l[j++] * X[l];
+        }
+        p.x += this.l[j++] * X[d];
+        if (d % 2) {
+            p.y += this.l[j++] * X[d];
+        }
+    }
+
+    // Unapply N normalization
+    p.x = this.C[0] + this.F * p.x;
+    p.y = this.C[1] + this.F * p.y;
     return p;
 }
 
-function parseDistorsion(xml) {
+// if anyone needs support for RadFour7x2, RadFour11x2, RadFour15x2 or RadFour19x2, micmac code is here :
+// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L720-L875
+
+function parseDistortion(xml) {
     xml = xml.children[0];
     var disto = { type: xml.tagName };
     var params;
@@ -149,10 +190,12 @@ function parseDistorsion(xml) {
     }
 
     switch (disto.type) {
+        case 'ModNoDist':
+            return undefined;
         case 'ModRad':
-            disto.C = getNumbers(xml, 'CDist'); // distorsion center in pixels
-            disto.R = getChildNumbers(xml, 'CoeffDist', []); // radial distorsion coefficients
-            disto.project = projectRad;
+            disto.C = getNumbers(xml, 'CDist'); // distortion center in pixels
+            disto.R = getChildNumbers(xml, 'CoeffDist', []); // radial distortion coefficients
+            disto.project = projectRadial;
             return disto;
         case 'eModelePolyDeg2':
         case 'eModelePolyDeg3':
@@ -167,7 +210,7 @@ function parseDistorsion(xml) {
             // degree could be decreased if params has a long enough tail of zeroes
             var firstZero = params.length - params.reverse().findIndex(x => x !== 0);
             params.reverse();
-            for (var d = disto.degree - 1; d > 1; --d) {
+            for (var d = disto.degree - 1; d > 0; --d) {
                 var l = d * (d + 3) - 4; // = length of R at degree d, as l(2)=6 and l(n)=l(n-1)+2n+2
                 if (firstZero <= l) {
                     params = params.slice(0, l);
@@ -175,37 +218,37 @@ function parseDistorsion(xml) {
                 }
             }
             disto.R = params;
-            disto.project = projectPolyDeg;
+            disto.project = projectPolynom;
             return disto;
         case 'ModPhgrStd':
-            disto.C = getNumbers(xml, 'CDist'); // distorsion center in pixels
-            disto.R = getChildNumbers(xml, 'CoeffDist'); // radial distorsion coefficients
-            disto.P = getNumbers(xml, 'P1').concat(getNumbers(xml, 'P2'));
+            disto.C = getNumbers(xml, 'CDist'); // distortion center in pixels
+            disto.R = getChildNumbers(xml, 'CoeffDist'); // radial distortion coefficients
+            disto.P = getNumbers(xml, 'P1', [0]).concat(getNumbers(xml, 'P2', [0]));
             disto.b = getNumbers(xml, 'b1', [0]).concat(getNumbers(xml, 'b2', [0]));
-            disto.project = projectPhgrStd;
+            disto.project = projectFraser;
             return disto;
         case 'eModeleEbner':
-            disto.B2 = states[0] * states[0] * 2 / 3;
+            disto.B2 = states[0] * states[0] / 1.5;
             disto.P = params;
             disto.project = projectEbner;
             return disto;
         case 'eModeleDCBrown':
             disto.F = states[0];
             disto.P = params;
-            disto.project = projectDCBrown;
+            disto.project = projectBrown;
             return disto;
         case 'eModele_FishEye_10_5_5':
         case 'eModele_EquiSolid_FishEye_10_5_5':
             disto.F = states[0];
             disto.C = params.slice(0, 2);
-            disto.R = params.slice(2, 7);
-            disto.P = params.slice(12, 14);
-            disto.l = params.slice(22, 24);
+            disto.R = params.slice(2, 12);
+            disto.P = params.slice(12, 22);
+            disto.l = params.slice(22);
             disto.equisolid = disto.type === 'eModele_EquiSolid_FishEye_10_5_5';
             disto.project = projectFishEye;
             return disto;
         default:
-            throw new Error(`Error parsing micmac orientation : unknown distorsion ${xml.tagName}`);
+            throw new Error(`Error parsing micmac orientation : unknown distortion ${xml.tagName}`);
     }
 }
 
@@ -228,7 +271,10 @@ function parseIntrinsics(xml) {
     f[1] = f[1] || f[0]; // fy defaults to fx
 
     camera.size = getNumbers(xml, 'SzIm'); // image size in pixels
-    camera.distos = Array.from(distos).map(parseDistorsion).reverse();
+    camera.distos = Array.from(distos)
+        .map(parseDistortion)
+        .filter(x => x) // filter undefined values
+        .reverse(); // see the doc
     // projectionMatrix turns metric camera coordinates (x left, y down, z front) to pixel coordinates (0,0 is top left) and inverse depth (m^-1)
     camera.projectionMatrix = new THREE.Matrix4().set(
         f[0], 0, p[0], 0,
@@ -243,59 +289,73 @@ function parseIntrinsics(xml) {
     return camera;
 }
 
-// ported from "cConvExplicite MakeExplicite(eConventionsOrientation aConv)" in micmac/src/ori_phot/orilib.cpp
-function parseAngularConv(xml) {
-    console.warn('parseAngularConv has never been tested');
+// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/ori_phot/orilib.cpp#L3069-L3190
+function parseConv(xml) {
     var KnownConv = getText(xml, 'KnownConv');
+    if (!KnownConv) return undefined;
     var degree = THREE.Math.DEG2RAD;
     var grade = THREE.Math.DEG2RAD * 180 / 200;
+    var lin = [1, 1, 1];
+    var Cardan = true;
     switch (KnownConv) {
-        case 'eConvApero_DistM2C' : return { order: 'ZYX', scale: degree };
-        case 'eConvApero_DistC2M' : return { order: 'ZYX', scale: degree };
-        case 'eConvOriLib' : return { order: 'XYZ', scale: degree };
-        case 'eConvMatrPoivillier_E' : return { order: 'XYZ', scale: degree };
-        case 'eConvAngErdas' : return { order: 'XYZ', scale: degree };
-        case 'eConvAngErdas_Grade' : return { order: 'XYZ', scale: grade };
-        case 'eConvAngPhotoMDegre' : return { order: 'XYZ', scale: degree };
-        case 'eConvAngPhotoMGrade' : return { order: 'XYZ', scale: grade };
+        case 'eConvApero_DistM2C' : return { Cardan, lin, Video: true, DistC2M: false, MatrC2M: true, col: [1, 1, 1], scale: degree, order: 'ZYX' };
+        case 'eConvApero_DistC2M': return { Cardan, lin, Video: true, DistC2M: true, MatrC2M: true, col: [1, 1, 1], scale: degree, order: 'ZYX' };
+        case 'eConvOriLib': return { Cardan, lin, Video: true, DistC2M: false, MatrC2M: true, col: [1, 1, 1], scale: degree, order: 'XYZ' };
+        case 'eConvMatrPoivillier_E': return { Cardan, lin, Video: false, DistC2M: false, MatrC2M: false, col: [1, -1, -1], scale: degree, order: 'XYZ' };
+        case 'eConvAngErdas' : return { Cardan, lin, Video: true, DistC2M: false, MatrC2M: false, col: [1, -1, -1], scale: degree, order: 'XYZ' };
+        case 'eConvAngErdas_Grade': return { Cardan, lin, Video: true, DistC2M: false, MatrC2M: false, col: [1, -1, -1], scale: grade, order: 'XYZ' };
+        case 'eConvAngPhotoMDegre': return { Cardan, lin, Video: true, DistC2M: false, MatrC2M: true, col: [1, -1, -1], scale: degree, order: 'XYZ' };
+        case 'eConvAngPhotoMGrade': return { Cardan, lin, Video: true, DistC2M: false, MatrC2M: true, col: [1, -1, -1], scale: grade, order: 'XYZ' };
+        case 'eConvMatrixInpho': return { Cardan, lin, Video: true, DistC2M: false, MatrC2M: false, col: [1, -1, -1], scale: undefined, order: 'XYZ' };
+        case 'eConvAngLPSDegre': return { Cardan, lin, Video: true, DistC2M: false, MatrC2M: true, col: [1, -1, -1], scale: degree, order: 'YXZ' };
         default: throw new Error(`Error parsing micmac orientation : unknown rotation convention : ${KnownConv}`);
     }
 }
 
+// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/ori_phot/orilib.cpp#L4127-L4139
+// https://github.com/micmacIGN/micmac/blob/bee473615bec715884aaa639642add0812e8c378/src/uti_files/CPP_Ori_txt2Xml.cpp#L1546-L1600
 function parseExtrinsics(xml, conv) {
-    var KnownConv = getText(xml, 'KnownConv');
-    if (KnownConv !== 'eConvApero_DistM2C') {
-        throw new Error(`Error parsing micmac orientation : unknown convention ${KnownConv}`);
-    }
+    conv = parseConv(xml) || parseConv(conv);
     var C = getNumbers(xml, 'Centre');
 
     xml = xml.getElementsByTagName('ParamRotation')[0];
     var encoding = xml && xml.children[0] ? xml.children[0].tagName : 'No or empty ParamRotation tag';
+    var M = new THREE.Matrix4();
     switch (encoding) {
         case 'CodageMatr':
             var L1 = getNumbers(xml, 'L1');
             var L2 = getNumbers(xml, 'L2');
             var L3 = getNumbers(xml, 'L3');
-            return new THREE.Matrix4().set(
-                L1[0], L1[1], L1[2], C[0],
-                L2[0], L2[1], L2[2], C[1],
-                L3[0], L3[1], L3[2], C[2],
+            M.set(
+                L1[0], L1[1], L1[2], 0,
+                L2[0], L2[1], L2[2], 0,
+                L3[0], L3[1], L3[2], 0,
                 0, 0, 0, 1);
+            break;
 
         case 'CodageAngulaire':
             console.warn('CodageAngulaire has never been tested');
-            conv = parseAngularConv(conv);
             var A = getNumbers(xml, 'CodageAngulaire').map(x => x * conv.scale);
             var E = new THREE.Euler(A[0], A[1], A[2], conv.order);
-            var M = new THREE.Matrix4().makeRotationFromEuler(E);
-            M.elements[12] = C[0];
-            M.elements[13] = C[1];
-            M.elements[14] = C[2];
-            return M;
+            M.makeRotationFromEuler(E);
+            break;
 
         default:
             throw new Error(`Error parsing micmac orientation, rotation encoding : ${encoding}`);
     }
+    if (!conv.MatrC2M) M.transpose();
+    for (var i = 0; i < 3; ++i) {
+        for (var j = 0; j < 3; ++j) {
+            // it is one or the other (to be checked):
+            // M.elements[4*j+i] *= conv.col[i] * conv.lin[j];
+            M.elements[4 * j + i] *= conv.col[j] * conv.lin[i];
+        }
+    }
+    // setup the translation
+    M.elements[12] = C[0];
+    M.elements[13] = C[1];
+    M.elements[14] = C[2];
+    return M;
 }
 
 function parseInternal(xml) {
