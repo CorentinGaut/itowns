@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import Distortion from './Distortion';
 
 function getText(xml, tagName) {
     var node = xml.getElementsByTagName(tagName)[0];
@@ -13,170 +14,6 @@ function getNumbers(xml, tagName, value) {
 function getChildNumbers(xml, tagName) {
     return Array.from(xml.getElementsByTagName(tagName)).map(node => Number(node.childNodes[0].nodeValue));
 }
-
-// polynom with coefficients c evaluated at x using Horner's method
-function polynom(c, x) {
-    var res = c[c.length - 1];
-    for (var i = c.length - 2; i >= 0; --i) {
-        res = res * x + c[i];
-    }
-    return res;
-}
-
-// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L441-L475
-// WithFraser=false
-function projectRadial(p) {
-    var x = p.x - this.C[0];
-    var y = p.y - this.C[1];
-    var r2 = x * x + y * y;
-    var radial = r2 * polynom(this.R, r2);
-    p.x += radial * x;
-    p.y += radial * y;
-    return p;
-}
-
-// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L441-L475
-// WithFraser=true
-function projectFraser(p) {
-    var x = p.x - this.C[0];
-    var y = p.y - this.C[1];
-    var x2 = x * x;
-    var y2 = y * y;
-    var xy = x * y;
-    var r2 = x2 + y2;
-    var radial = r2 * polynom(this.R, r2);
-    p.x += radial * x + this.P[0] * (2 * x2 + r2) + this.P[1] * 2 * xy;
-    p.y += radial * y + this.P[1] * (2 * y2 + r2) + this.P[0] * 2 * xy;
-    p.x += this.b[0] * x + this.b[1] * y;
-    return p;
-}
-
-// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L361-L396
-function projectEbner(p) {
-    var x = p.x;
-    var y = p.y;
-    var x2 = x * x - this.B2;
-    var y2 = y * y - this.B2;
-    var xy = x * y;
-    var xy2 = x * y2;
-    var yx2 = y * x2;
-    var x2y2 = x2 * y2;
-    var P = this.P;
-    p.x += P[0] * x + P[1] * y + P[3] * xy - 2 * P[2] * x2 + P[4] * y2 + P[6] * xy2 + P[8] * yx2 + P[10] * x2y2;
-    p.y += P[1] * x - P[0] * y + P[2] * xy - 2 * P[3] * y2 + P[5] * x2 + P[9] * xy2 + P[7] * yx2 + P[11] * x2y2;
-    return p;
-}
-
-// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L401-L439
-function projectBrown(p) {
-    var x = p.x;
-    var y = p.y;
-    var x2 = x * x;
-    var y2 = y * y;
-    var xy = x * y;
-    var xy2 = x * y2;
-    var yx2 = y * x2;
-    var x2y2 = x2 * y2;
-    var P = this.P;
-    var f = (P[12] * x2y2 / this.F) + (P[13] * (x2 + y2));
-    p.x += P[0] * x + P[1] * y;
-    p.x += P[2] * xy + P[3] * y2 + P[4] * yx2 + P[5] * xy2 + P[6] * x2y2 + f * x;
-    p.y += P[7] * xy + P[8] * x2 + P[9] * yx2 + P[10] * xy2 + P[11] * x2y2 + f * y;
-    return p;
-}
-
-// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L527-L591
-function projectPolynom(p) {
-    // Apply N normalization
-    p.x = (p.x - this.C[0]) / this.S;
-    p.y = (p.y - this.C[1]) / this.S;
-
-    var R = this.R;
-    var x = p.x;
-    var y = p.y;
-
-    // degree 2
-    var X = [x * x, x * y, y * y];
-    p.x += R[0] * x + R[1] * y + R[3] * X[1] - 2 * R[2] * X[0] + R[4] * X[2];
-    p.y += R[1] * x - R[0] * y + R[2] * X[1] - 2 * R[3] * X[2] + R[5] * X[0];
-
-    // degree 3+
-    var i = 6;
-    for (var d = 3; i < R.length; ++d) {
-        var j = i + d + 1;
-        X[d] = y * X[d - 1];
-        for (var l = 0; l < d; ++l) {
-            X[l] *= x;
-            p.x += R[i + l] * X[l];
-            p.y += R[j + l] * X[l];
-        }
-        p.x += R[i + d] * X[d];
-        p.y += R[j + d] * X[d];
-        i = j + d + 1;
-    }
-
-    // Unapply N normalization
-    p.x = this.C[0] + this.S * p.x;
-    p.y = this.C[1] + this.S * p.y;
-    return p;
-}
-
-// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L2169-L2352
-function projectFishEye(p) {
-    // Apply N normalization
-    var A = (p.x - this.C[0]) / this.F;
-    var B = (p.y - this.C[1]) / this.F;
-    var R = Math.sqrt(A * A + B * B);
-    var theta = Math.atan(R);
-    if (this.equisolid) theta = 2 * Math.sin(0.5 * theta);
-    var lambda = theta / R;
-    var x = lambda * A;
-    var y = lambda * B;
-    var x2 = x * x;
-    var xy = x * y;
-    var y2 = y * y;
-    var r2 = x2 + y2;
-
-    // radial distortion and degree 1 polynomial
-    var radial = 1 + r2 * polynom(this.R, r2);
-    p.x = y * this.l[1] + x * (radial + this.l[0]);
-    p.y = x * this.l[1] + y * radial;
-
-    // tangential distortion
-    var rk = 1;
-    for (var k = 0; k < this.P.length; k += 2) {
-        var K = k + 2;
-        p.x += rk * ((r2 + K * x2) * this.P[k] + this.P[k + 1] * K * xy);
-        p.y += rk * ((r2 + K * y2) * this.P[k + 1] + this.P[k] * K * xy);
-        rk *= r2;
-    }
-
-    // degree 3+ polynomial (no degree 2)
-    var X = [x2, xy, y2];
-    var j = 2;
-    for (var d = 3; j < this.l.length; ++d) {
-        X[d] = y * X[d - 1];
-        X[0] *= x;
-        p.y += this.l[j++] * X[0];
-        for (var l = 1; l < d; ++l) {
-            X[l] *= x;
-            p.x += this.l[j++] * X[l];
-            p.y += this.l[j++] * X[l];
-        }
-        p.x += this.l[j++] * X[d];
-        if (d % 2) {
-            p.y += this.l[j++] * X[d];
-        }
-    }
-
-    // Unapply N normalization
-    p.x = this.C[0] + this.F * p.x;
-    p.y = this.C[1] + this.F * p.y;
-    return p;
-}
-
-// if anyone needs support for RadFour7x2, RadFour11x2, RadFour15x2 or RadFour19x2, micmac code is here :
-// https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/photogram/phgr_ebner_brown_dist.cpp#L720-L875
 
 function parseDistortion(xml) {
     xml = xml.children[0];
@@ -195,7 +32,7 @@ function parseDistortion(xml) {
         case 'ModRad':
             disto.C = getNumbers(xml, 'CDist'); // distortion center in pixels
             disto.R = getChildNumbers(xml, 'CoeffDist', []); // radial distortion coefficients
-            disto.project = projectRadial;
+            disto.project = Distortion.projectRadial;
             return disto;
         case 'eModelePolyDeg2':
         case 'eModelePolyDeg3':
@@ -218,24 +55,24 @@ function parseDistortion(xml) {
                 }
             }
             disto.R = params;
-            disto.project = projectPolynom;
+            disto.project = Distortion.projectPolynom;
             return disto;
         case 'ModPhgrStd':
             disto.C = getNumbers(xml, 'CDist'); // distortion center in pixels
             disto.R = getChildNumbers(xml, 'CoeffDist'); // radial distortion coefficients
             disto.P = getNumbers(xml, 'P1', [0]).concat(getNumbers(xml, 'P2', [0]));
             disto.b = getNumbers(xml, 'b1', [0]).concat(getNumbers(xml, 'b2', [0]));
-            disto.project = projectFraser;
+            disto.project = Distortion.projectFraser;
             return disto;
         case 'eModeleEbner':
             disto.B2 = states[0] * states[0] / 1.5;
             disto.P = params;
-            disto.project = projectEbner;
+            disto.project = Distortion.projectEbner;
             return disto;
         case 'eModeleDCBrown':
             disto.F = states[0];
             disto.P = params;
-            disto.project = projectBrown;
+            disto.project = Distortion.projectBrown;
             return disto;
         case 'eModele_FishEye_10_5_5':
         case 'eModele_EquiSolid_FishEye_10_5_5':
@@ -245,7 +82,7 @@ function parseDistortion(xml) {
             disto.P = params.slice(12, 22);
             disto.l = params.slice(22);
             disto.equisolid = disto.type === 'eModele_EquiSolid_FishEye_10_5_5';
-            disto.project = projectFishEye;
+            disto.project = Distortion.projectFishEye;
             return disto;
         default:
             throw new Error(`Error parsing micmac orientation : unknown distortion ${xml.tagName}`);
@@ -281,8 +118,6 @@ function parseIntrinsics(xml) {
         0, f[1], p[1], 0,
         0, 0, 0, 1,
         0, 0, 1, 0);
-    camera.projectionMatrixInverse = new THREE.Matrix4();
-    camera.projectionMatrixInverse.getInverse(camera.projectionMatrix);
     if (rmax) {
         camera.r2max = rmax * rmax;
     }
@@ -372,11 +207,15 @@ function parseInternal(xml) {
             0, 0, 0, 1);
 }
 
-function parseOrientation(internal, intrinsics, extrinsics, conv, verif) {
+function parseOrientation(xml, intrinsics) {
+    var extrinsics = xml.getElementsByTagName('Externe')[0];
+    var internal = xml.getElementsByTagName('OrIntImaM2C')[0];
+    var verif = xml.getElementsByTagName('Verif')[0];
+    var conv = xml.getElementsByTagName('ConvOri')[0];
     var camera = parseIntrinsics(intrinsics);
     camera.matrixWorld = parseExtrinsics(extrinsics, conv);
-    camera.matrixWorldInverse = new THREE.Matrix4();
-    camera.matrixWorldInverse.getInverse(camera.matrixWorld);
+    camera.projectionMatrixInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
+    camera.matrixWorldInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
     internal = parseInternal(internal);
     if (internal) {
         camera.matrixImage = internal;
@@ -415,9 +254,9 @@ export default {
     /** @module MicmacOrientationParser */
     /** Parse an Orientation*.xml from Micmac (see {@link https://github.com/micmacIGN})
      * @function parse
-     * @param {string|XMLDocument} xml - the xml content of the oriention file.
-     * @param {Object} options : path
-     * @return {Promise} - a promise that resolves with a THREE.Points.
+     * @param {string|XMLDocument} xml - the xml content of the orientation file.
+     * @param {Object} options : fetch (fetcher for relative intrinsic files)
+     * @return {Promise} - a promise that resolves with a camera.
      *
      */
     parse: function parse(xml, options = {}) {
@@ -434,22 +273,12 @@ export default {
             throw new Error(`Error parsing micmac orientation : unknown projection type ${TypeProj}`);
         }
 
-        var intrinsics = xml.getElementsByTagName('Interne')[0];
-        var extrinsics = xml.getElementsByTagName('Externe')[0];
-        var internal = xml.getElementsByTagName('OrIntImaM2C')[0];
-        var verif = xml.getElementsByTagName('Verif')[0];
-        var conv = xml.getElementsByTagName('ConvOri')[0];
-
-        if (intrinsics) {
-            return Promise.resolve(parseOrientation(internal, intrinsics, extrinsics, conv, verif));
-        } else if (file) {
-            // 'RelativeNameFI' is not considered, since it is likely not making sense in a web context
-            // options.path is to be used instead
-            var url = options.path + file;
-            return options.fetch(url, 'text')
-            .then(intrinsics => parseOrientation(internal, intrinsics, extrinsics, conv, verif));
+        if (file) {
+            var promise = options.fetch(file, 'text');
+            return promise.then(intrinsics => parseOrientation(xml, intrinsics));
         } else {
-            throw new Error('Error parsing micmac orientation : no intrinsics');
+            var intrinsics = xml.getElementsByTagName('Interne')[0];
+            return Promise.resolve(parseOrientation(xml, intrinsics));
         }
     },
     format: 'micmac/orientation',

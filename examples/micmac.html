@@ -124,7 +124,9 @@
 
                         geometry.computeBoundingSphere();
                         var material = new THREE.MeshBasicMaterial( {color: 0x00ffff, wireframe} );
-                        group.add(new THREE.Mesh( geometry, material ));
+                        var mesh = new THREE.Mesh( geometry, material );
+                        // mesh.scale.set(1, 1, 1);
+                        group.add(mesh);
                     }
 
                     // place a sphere at the camera center
@@ -152,8 +154,16 @@
                         scene.add( cameraMesh(camera) );
                     };
                 }
-
-                var micmacParser = itowns.MicmacOrientationParser;
+                function parse(options) {
+                    var parsers = [itowns.MicmacOrientationParser, itowns.MatisOrientationParser];
+                    return function(xml) {
+                        for(const parser of parsers) {
+                            var parsed = parser.parse(xml, options);
+                            if (parsed) return parsed;
+                        }
+                        return undefined;
+                    }
+                }
                 function addFiles(event, dataTransfer) {
                     event.stopPropagation();
                     event.preventDefault();
@@ -192,7 +202,7 @@
                             case 'xml':
                         var options = { fetch };
                                 read(files[i], 'text')
-                                .then(xml => micmacParser.parse(xml, options))
+                                .then(parse(options))
                                 .then(handleOrientation(name));
                                 break;
                             default:
@@ -209,13 +219,14 @@
                 document.addEventListener('dragleave', prevDefault, false);
                 document.addEventListener('drop',  function(e) { addFiles(e, e.dataTransfer || window.dataTransfer); }, false);
 
-                function loadOrientation(path, name, options) {
-                    options = options || {};
-                    options.fetchOptions = options.fetchOptions || { "crossOrigin" : "anonymous" };
-                    options.fetch = options.fetch || (url => fetch(url, options.fetchOptions).then(response => response.text()));
-                    options.path = options.path || path;
+                function loadOrientation(path, name, options = {}) {
+                    if (!options.fetch) {
+                        var fetchOptions = options.fetchOptions || { "crossOrigin" : "anonymous" };
+                        path = path || options.path;
+                        options.fetch = url => fetch(path + url, fetchOptions).then(response => response.text());
+                    }
                     options.fetch(path + name)
-                        .then(xml => micmacParser.parse(xml, options))
+                        .then(parse(options))
                         .then(handleOrientation(name));
                 }
 
