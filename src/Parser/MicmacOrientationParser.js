@@ -96,7 +96,7 @@ function parseIntrinsics(xml) {
     if (!(xml instanceof Node)) {
         xml = new window.DOMParser().parseFromString(xml, 'text/xml');
     }
-    var camera = new THREE.Camera();
+    var camera = new THREE.PerspectiveCamera();
     var KnownConv = getText(xml, 'KnownConv');
     if (KnownConv !== 'eConvApero_DistM2C') {
         throw new Error(`Error parsing micmac orientation : unknown convention ${KnownConv}`);
@@ -113,21 +113,21 @@ function parseIntrinsics(xml) {
         .filter(x => x) // filter undefined values
         .reverse(); // see the doc
     // projectionMatrix turns metric camera coordinates (three.js conventions: x left, y up, z back) to pixel coordinates (0,0 is top left) and inverse depth (m^-1)
-    camera.projectionPixelMatrix = new THREE.Matrix4().set(
+    camera.preProjectionMatrix = new THREE.Matrix4().set(
         f[0], 0, -p[0], 0,
         0, -f[1], -p[1], 0,
         0, 0, 0, 1,
         0, 0, -1, 0);
+    camera.aspect = camera.size[0] / camera.size[1];
     camera.near = f[0] * 0.035 / camera.size[0];
     camera.far = 1000;
     var c = (camera.far + camera.near) / (camera.far - camera.near);
     var d = -2 * camera.far * camera.near / (camera.far - camera.near);
-    camera.pixelMatrix = new THREE.Matrix4().set(
+    camera.postProjectionMatrix = new THREE.Matrix4().set(
         2 / camera.size[0], 0, 0, -1,
         0, -2 / camera.size[1], 0, 1,
         0, 0, d, c,
         0, 0, 0, 1);
-    camera.projectionMatrix.multiplyMatrices(camera.pixelMatrix, camera.projectionPixelMatrix);
     if (rmax) {
         camera.r2max = rmax * rmax;
     }
@@ -233,17 +233,26 @@ function parseOrientation(xml, intrinsics) {
     var conv = xml.getElementsByTagName('ConvOri')[0];
     var camera = parseIntrinsics(intrinsics);
     camera.matrix = parseExtrinsics(extrinsics, conv);
-    camera.matrix.decompose(camera.position, camera.quaternion, camera.scale);
-    camera.matrixAutoUpdate = false;
-    camera.updateMatrixWorld(true);
-    camera.projectionMatrixInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
     internal = parseInternal(internal);
+    camera.matrix.decompose(camera.position, camera.quaternion, camera.scale);
+    // camera.matrixAutoUpdate = false;
+    camera.updateMatrixWorld(true);
     if (internal) {
         camera.matrixImage = internal;
+        camera.postProjectionMatrix.multiply(camera.matrixImage);
     }
+    camera.uvProjectionMatrix = new THREE.Matrix4().set(
+        1, 0, 0, 1,
+        0, 1, 0, 1,
+        0, 0, 2, 0,
+        0, 0, 0, 2).multiply(camera.postProjectionMatrix);
+    // exact transform is : matrixWorldInverse -> preProjectionMatrix -> distos -> postProjectionMatrix
+    // projectionMatrix neglects distos in : preProjectionMatrix -> (distos) -> postProjectionMatrix
+    camera.projectionMatrix.multiplyMatrices(camera.postProjectionMatrix, camera.preProjectionMatrix);
+    camera.projectionMatrixInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
     camera.project = function project(p, skipImage) {
         p.applyMatrix4(this.matrixWorldInverse);
-        p.applyMatrix4(this.projectionPixelMatrix);
+        p.applyMatrix4(this.preProjectionMatrix);
         p = this.distos.reduce((q, disto) => disto.project(q), p);
         if (this.matrixImage && !skipImage) {
             p.applyMatrix4(this.matrixImage);
