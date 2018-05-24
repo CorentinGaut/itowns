@@ -112,21 +112,21 @@ function parseIntrinsics(xml) {
         .map(parseDistortion)
         .filter(x => x) // filter undefined values
         .reverse(); // see the doc
-    // projectionMatrix turns metric camera coordinates (x left, y down, z front) to pixel coordinates (0,0 is top left) and inverse depth (m^-1)
+    // projectionMatrix turns metric camera coordinates (three.js conventions: x left, y up, z back) to pixel coordinates (0,0 is top left) and inverse depth (m^-1)
     camera.projectionPixelMatrix = new THREE.Matrix4().set(
-        f[0], 0, p[0], 0,
-        0, f[1], p[1], 0,
+        f[0], 0, -p[0], 0,
+        0, -f[1], -p[1], 0,
         0, 0, 0, 1,
-        0, 0, 1, 0);
-    camera.near = f[0] * 0.36 / camera.size[0];
-    camera.far = 10 * camera.near;
-    var c = -(camera.far + camera.near) / (camera.far - camera.near);
-    var d = 2 * camera.far * camera.near / (camera.far - camera.near);
+        0, 0, -1, 0);
+    camera.near = f[0] * 0.035 / camera.size[0];
+    camera.far = 1000;
+    var c = (camera.far + camera.near) / (camera.far - camera.near);
+    var d = -2 * camera.far * camera.near / (camera.far - camera.near);
     camera.pixelMatrix = new THREE.Matrix4().set(
-        -2 / camera.size[0], 0, 0, 1,
+        2 / camera.size[0], 0, 0, -1,
         0, -2 / camera.size[1], 0, 1,
         0, 0, d, c,
-        0, 0, 0, -1);
+        0, 0, 0, 1);
     camera.projectionMatrix.multiplyMatrices(camera.pixelMatrix, camera.projectionPixelMatrix);
     if (rmax) {
         camera.r2max = rmax * rmax;
@@ -196,6 +196,15 @@ function parseExtrinsics(xml, conv) {
             M.elements[4 * j + i] *= conv.col[j] * conv.lin[i];
         }
     }
+
+    // three.js conventions : Y -> -Y, Z -> -Z
+    M.elements[4] = -M.elements[4];
+    M.elements[5] = -M.elements[5];
+    M.elements[6] = -M.elements[6];
+    M.elements[8] = -M.elements[8];
+    M.elements[9] = -M.elements[9];
+    M.elements[10] = -M.elements[10];
+
     // setup the translation
     M.elements[12] = C[0];
     M.elements[13] = C[1];
@@ -223,9 +232,10 @@ function parseOrientation(xml, intrinsics) {
     var verif = xml.getElementsByTagName('Verif')[0];
     var conv = xml.getElementsByTagName('ConvOri')[0];
     var camera = parseIntrinsics(intrinsics);
+    camera.matrix = parseExtrinsics(extrinsics, conv);
+    camera.matrix.decompose(camera.position, camera.quaternion, camera.scale);
     camera.matrixAutoUpdate = false;
-    camera.matrixWorld = parseExtrinsics(extrinsics, conv);
-    camera.matrixWorldInverse.getInverse(camera.matrixWorld);
+    camera.updateMatrixWorld(true);
     camera.projectionMatrixInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
     internal = parseInternal(internal);
     if (internal) {
@@ -242,9 +252,11 @@ function parseOrientation(xml, intrinsics) {
     };
     if (verif) {
         camera.checkEpsilon = getNumbers(verif, 'Tol')[0];
-        camera.check = function check(epsilon) {
+        camera.check = function check(epsilon, N) {
             epsilon = epsilon || this.checkEpsilon;
-            return Array.from(verif.getElementsByTagName('Appuis')).reduce((ok, point) => {
+            var array = Array.from(verif.getElementsByTagName('Appuis'));
+            if (N) array = array.slice(0, N);
+            return array.reduce((ok, point) => {
                 var id = getNumbers(point, 'Num')[0];
                 var p2 = new THREE.Vector2().fromArray(getNumbers(point, 'Im'));
                 var p3 = new THREE.Vector3().fromArray(getNumbers(point, 'Ter'));
@@ -258,7 +270,6 @@ function parseOrientation(xml, intrinsics) {
             }, true);
         };
     }
-    console.log(camera);
     return camera;
 }
 
