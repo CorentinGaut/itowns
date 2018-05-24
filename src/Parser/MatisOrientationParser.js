@@ -31,7 +31,7 @@ function parseSpheric(xml, camera) {
 
 function parseConic(xml, camera) {
     var p = getNumbers(xml, 'ppa', ['c', 'l', 'focale']);
-    camera.projectionMatrix = new THREE.Matrix4().set(
+    camera.projectionMatrix.set(
         p[2], 0, p[0], 0,
         0, p[2], p[1], 0,
         0, 0, 0, 1,
@@ -47,7 +47,7 @@ function parseConic(xml, camera) {
 }
 
 function parseIntrinsics(xml) {
-    var camera = {};
+    var camera = new THREE.Camera();
     camera.size = getNumbers(xml, 'image_size', ['width', 'height']);
     camera.distos = [];
 
@@ -109,7 +109,7 @@ export default {
         var camera = parseIntrinsics(xml);
         camera.matrixWorld = parseExtrinsics(xml);
         camera.projectionMatrixInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
-        camera.matrixWorldInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
+        camera.matrixWorldInverse.getInverse(camera.projectionMatrix);
         camera.project = function project(p) {
             p = p.project(this);
             return this.distos.reduce((q, disto) => disto.project(q), p);

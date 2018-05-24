@@ -96,7 +96,7 @@ function parseIntrinsics(xml) {
     if (!(xml instanceof Node)) {
         xml = new window.DOMParser().parseFromString(xml, 'text/xml');
     }
-    var camera = {};
+    var camera = new THREE.Camera();
     var KnownConv = getText(xml, 'KnownConv');
     if (KnownConv !== 'eConvApero_DistM2C') {
         throw new Error(`Error parsing micmac orientation : unknown convention ${KnownConv}`);
@@ -113,11 +113,21 @@ function parseIntrinsics(xml) {
         .filter(x => x) // filter undefined values
         .reverse(); // see the doc
     // projectionMatrix turns metric camera coordinates (x left, y down, z front) to pixel coordinates (0,0 is top left) and inverse depth (m^-1)
-    camera.projectionMatrix = new THREE.Matrix4().set(
+    camera.projectionPixelMatrix = new THREE.Matrix4().set(
         f[0], 0, p[0], 0,
         0, f[1], p[1], 0,
         0, 0, 0, 1,
         0, 0, 1, 0);
+    camera.near = f[0] * 0.36 / camera.size[0];
+    camera.far = 10 * camera.near;
+    var c = -(camera.far + camera.near) / (camera.far - camera.near);
+    var d = 2 * camera.far * camera.near / (camera.far - camera.near);
+    camera.pixelMatrix = new THREE.Matrix4().set(
+        -2 / camera.size[0], 0, 0, 1,
+        0, -2 / camera.size[1], 0, 1,
+        0, 0, d, c,
+        0, 0, 0, -1);
+    camera.projectionMatrix.multiplyMatrices(camera.pixelMatrix, camera.projectionPixelMatrix);
     if (rmax) {
         camera.r2max = rmax * rmax;
     }
@@ -213,15 +223,17 @@ function parseOrientation(xml, intrinsics) {
     var verif = xml.getElementsByTagName('Verif')[0];
     var conv = xml.getElementsByTagName('ConvOri')[0];
     var camera = parseIntrinsics(intrinsics);
+    camera.matrixAutoUpdate = false;
     camera.matrixWorld = parseExtrinsics(extrinsics, conv);
+    camera.matrixWorldInverse.getInverse(camera.matrixWorld);
     camera.projectionMatrixInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
-    camera.matrixWorldInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
     internal = parseInternal(internal);
     if (internal) {
         camera.matrixImage = internal;
     }
     camera.project = function project(p, skipImage) {
-        p = p.project(this);
+        p.applyMatrix4(this.matrixWorldInverse);
+        p.applyMatrix4(this.projectionPixelMatrix);
         p = this.distos.reduce((q, disto) => disto.project(q), p);
         if (this.matrixImage && !skipImage) {
             p.applyMatrix4(this.matrixImage);
@@ -246,6 +258,7 @@ function parseOrientation(xml, intrinsics) {
             }, true);
         };
     }
+    console.log(camera);
     return camera;
 }
 
