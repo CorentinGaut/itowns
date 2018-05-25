@@ -35,12 +35,12 @@
         </script>
         <script src="https://unpkg.com/three@0.89.0/examples/js/loaders/PLYLoader.js"></script>
         <script src="https://unpkg.com/three@0.89.0/examples/js/controls/OrbitControls.js"></script>
-        <script src="https://unpkg.com/three@0.89.0/examples/js/controls/FirstPersonControls.js"></script>
+        <!-- <script src="https://unpkg.com/three@0.89.0/examples/js/controls/FirstPersonControls.js"></script> -->
         <script>
             var container;
 
-            var camera, orbitCamera, orbitTarget, scene, renderer, plyGroup, cameras, cameraId = 0, texMaterial, wireMaterial;
-            var firstPersonControls, orbitControls, clock;
+            var camera, orbitCamera, orbitTarget, scene, renderer, plyGroup, cameras, cameraId, texMaterial, wireMaterial, orbitControls;
+            // var firstPersonControls, clock;
 
             init();
             animate();
@@ -60,7 +60,7 @@
                 // materials
                 wireMaterial = new THREE.MeshBasicMaterial( {color: 0x00ffff, wireframe: true} );
                 texMaterial = new THREE.MeshBasicMaterial();
-				var textureLoader = new THREE.TextureLoader();
+                var textureLoader = new THREE.TextureLoader();
                 texMaterial.opacity = 0.2;
                 texMaterial.transparent = true;
                 texMaterial.blending = THREE.NormalBlending;
@@ -88,10 +88,10 @@
 
 /*
                 firstPersonControls = new THREE.FirstPersonControls( camera.clone(), renderer.domElement );
-				firstPersonControls.movementSpeed = 0;
-				firstPersonControls.rollSpeed = Math.PI / 2;
+                firstPersonControls.movementSpeed = 0;
+                firstPersonControls.rollSpeed = Math.PI / 2;
                 firstPersonControls.enabled = false;
-				clock = new THREE.Clock();
+                clock = new THREE.Clock();
 */
 
                 // PLY file
@@ -104,6 +104,11 @@
                         console.log(name);
                         var points = new THREE.Points( geometry, plyMaterial );
                         plyGroup.add( points );
+                        geometry.computeBoundingBox();
+                        var center = new THREE.Vector3();
+                        geometry.boundingBox.getCenter(center);
+                        points.updateMatrixWorld(true);
+                        updateOrbitTarget(points.localToWorld(center));
                     };
                 };
                 var loadPly = function(url) { plyParser.load( url, handlePly(url) ); };
@@ -160,6 +165,15 @@
                 }
                 handleImage('uv')('data/uv.jpg');
 
+                function updateOrbitTarget(position, delta) {
+                    delta = delta || new THREE.Vector3(10,10,10);
+                    sum.add(position);
+                    Nsum++;
+                    orbitControls.target.copy(sum).divideScalar(Nsum);
+                    orbitControls.object.position.copy(orbitControls.target).add(delta);
+                    orbitControls.saveState();
+                }
+
                 function handleOrientation(name) {
                     return function(camera) {
                         if (!camera) return;
@@ -169,14 +183,8 @@
                         console.log(check, name, camera);
                         camera.add(cameraMesh(camera));
                         scene.add(camera);
-
-                        // target the average of all camera centers
-                        sum.add(camera.position);
-                        Nsum++;
-                        orbitControls.target.copy(sum).divideScalar(Nsum);
-                        orbitControls.object.position.copy(orbitControls.target).add(new THREE.Vector3(10,10,10));
-                        orbitControls.saveState();
                         cameras.push(camera);
+                        updateOrbitTarget(camera.position);
                     };
                 }
                 function parse(options) {
@@ -320,13 +328,13 @@
             }
 
             function onWindowResize() {
-//				firstPersonControls.handleResize();
+//                firstPersonControls.handleResize();
                 renderer.setSize( window.innerWidth, window.innerHeight );
             }
 
             function animate() {
 /*
-				var delta = clock.getDelta();
+                var delta = clock.getDelta();
                 firstPersonControls.update(delta);
 */
                 orbitControls.update(); // only required if orbitControls.enableDamping = true, or if orbitControls.autoRotate = true
