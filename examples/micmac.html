@@ -29,6 +29,7 @@
                 <li>AperiCloud*.ply</li>
             </ul>
         </div>
+        <script src="js/GUI/dat.gui/dat.gui.min.js"></script>
         <script src="../dist/itowns.js"></script>
         <script>
             var THREE = itowns.THREE;
@@ -41,6 +42,7 @@
 
             var camera, orbitCamera, orbitTarget, scene, renderer, plyGroup, cameras, cameraId, texMaterial, wireMaterial, orbitControls;
             // var firstPersonControls, clock;
+            var gui, cameraGUI;
 
             init();
             animate();
@@ -137,13 +139,13 @@
                 handleImage('uv')('data/uv.jpg');
 
                 /* Orientation loading */
-                function cameraMesh(camera) {
+                function cameraGroup(camera) {
                     // create the group (looking at intrinsics only) that should be added to the camera frame.
                     var group = new THREE.Group();
 
                     // place a frustum
                     {
-                        var m = camera.projectionMatrixInverse;
+                        m = new THREE.Matrix4().getInverse(camera.projectionMatrix);
                         var geometry = new THREE.BufferGeometry();
                         var vertices = new Float32Array(15);
                         // get the 4 corners on the near plane (neglecting distortion)
@@ -181,7 +183,7 @@
                         var check = '[?]';
                         if (camera.check) check = camera.check() ? '[Y]' : '[N]';
                         console.log(check, name, camera);
-                        camera.add(cameraMesh(camera));
+                        camera.add(cameraGroup(camera));
                         camera.zoom = 0.9; // zoom out a bit to see the image borders
                         scene.add(camera);
                         cameras.push(camera);
@@ -292,6 +294,7 @@
                     camera = cameras[cameraId];
                     orbitControls.enabled = cameraId === 0;
                     onWindowResize();
+                    updateGUI();
 /*
                     firstPersonControls.enabled = !orbitControls.enabled;
                     if (firstPersonControls.enabled) {
@@ -308,6 +311,7 @@
                         case 'b': setCamera(cameraId - 1);  break;
                         case 'n': setCamera(cameraId + 1);  break;
                         case 'c': console.log(camera); break;
+                        case 'p': camera.add(cameraGroup(new THREE.PerspectiveCamera().copy(camera))); break;
                         default : console.log(event.key);
                     }
                 }                
@@ -332,6 +336,82 @@
                 // loadFileImSel(base + 'Chambord/', 'Ori-MEP_TN/');
                 // loadFileImSel(base + 'Chambord/', 'Ori-MEP_TS/'); // no FileImSel.xml
             }
+
+            /* GUI */
+            gui = new dat.GUI();
+            var params = {
+                view: {
+                    enabled: false,
+                    offsetX: 0,
+                    offsetY: 0,
+                    width: 1,
+                    height: 1,
+                    fullWidth: 1,
+                    fullHeight: 1,
+                },
+            };
+
+            function updateDisplays(gui) {
+                for (var i in gui.__controllers) {
+                    gui.__controllers[i].updateDisplay();
+                }
+                for (var i in gui.__folders) {
+                    updateDisplays(gui.__folders[i]);
+                }
+            }
+
+            function updateGUI() {
+                params.zoom = camera.zoom;
+                if (camera.view) {
+                    params.view.enabled = camera.view.enabled;
+                    params.view.offsetX = camera.view.offsetX;
+                    params.view.offsetY = camera.view.offsetY;
+                    params.view.width = camera.view.width;
+                    params.view.height = camera.view.height;
+                    params.view.fullWidth = camera.view.fullWidth;
+                    params.view.fullHeight = camera.view.fullHeight;
+                } else {
+                    params.view.enabled = false;
+                    params.view.offsetX = 0;
+                    params.view.offsetY = 0;
+                    params.view.width = 1;
+                    params.view.height = 1;
+                    params.view.fullWidth = 1;
+                    params.view.fullHeight = 1;
+                }
+                updateDisplays(gui);
+            }
+
+            function updateProjectionMatrixGUI() {
+                camera.zoom = params.zoom;
+                if (params.view.enabled) {
+                    if (!camera.view) {
+                        camera.view = {};
+                    }
+                    camera.view.enabled = params.view.enabled;
+                    camera.view.offsetX = params.view.offsetX;
+                    camera.view.offsetY = params.view.offsetY;
+                    camera.view.width = params.view.width;
+                    camera.view.height = params.view.height;
+                    camera.view.fullWidth = params.view.fullWidth;
+                    camera.view.fullHeight = params.view.fullHeight;
+                } else if (camera.view) {
+                    camera.view.enabled = false;
+                }
+                camera.updateProjectionMatrix();
+            }
+
+            updateGUI();
+            gui.add(params, 'zoom', 0, 2).onChange(updateProjectionMatrixGUI);
+            viewGUI = gui.addFolder('View');
+            viewGUI.add(params.view, 'enabled').onChange(updateProjectionMatrixGUI);
+            viewGUI.add(params.view, 'offsetX').onChange(updateProjectionMatrixGUI);
+            viewGUI.add(params.view, 'offsetY').onChange(updateProjectionMatrixGUI);
+            viewGUI.add(params.view, 'width',0).onChange(updateProjectionMatrixGUI);
+            viewGUI.add(params.view, 'height',0).onChange(updateProjectionMatrixGUI);
+            viewGUI.add(params.view, 'fullWidth',0).onChange(updateProjectionMatrixGUI);
+            viewGUI.add(params.view, 'fullHeight',0).onChange(updateProjectionMatrixGUI);
+            updateGUI();
 
             /* callbacks */
             function onWindowResize() {

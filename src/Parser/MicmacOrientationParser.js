@@ -209,15 +209,15 @@ function parseView(xml) {
     if (C.x === 0 && C.y === 0 && X.x === 1 && X.y === 0 && Y.x === 0 && Y.y === 1) {
         return null;
     }
-    console.warning('Not sure about the OrIntImaM2C -> THREE/offsetViewWithSkew conversion');
+    if (X.y !== 0 || Y.x !== 0) {
+        console.warn('PhotogrammetricCamera does not support non null values for V01[0] and V10[1]');
+    }
     return {
         enabled: true,
         fullWidth: X.x,
         fullHeight: Y.y,
-        offsetX: -C.x * X.x,
-        offsetY: -C.y * Y.y,
-        skewX: Y.x * X.x,
-        skewY: X.y * Y.y,
+        offsetX: -C.x / X.x,
+        offsetY: -C.y / Y.y,
         width: 1,
         height: 1,
     };
