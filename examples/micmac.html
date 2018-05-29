@@ -85,7 +85,6 @@
                 orbitControls.screenSpacePanning = false;
                 orbitControls.maxPolarAngle = 0.75 * Math.PI;
                 orbitControls.addEventListener( 'change', render ); // call this only in static scenes (i.e., if there is no animation loop)
-
 /*
                 firstPersonControls = new THREE.FirstPersonControls( camera.clone(), renderer.domElement );
                 firstPersonControls.movementSpeed = 0;
@@ -94,7 +93,19 @@
                 clock = new THREE.Clock();
 */
 
-                // PLY file
+                var sum = new THREE.Vector3(0, 0, 0);
+                var Nsum = 0;
+                function updateOrbitTarget(position, delta) {
+                    delta = delta || new THREE.Vector3(10,10,10);
+                    sum.add(position);
+                    Nsum++;
+                    orbitControls.target.copy(sum).divideScalar(Nsum);
+                    orbitControls.object.position.copy(orbitControls.target).add(delta);
+                    orbitControls.saveState();
+                }
+
+
+                /* Ply loading */
                 plyGroup = new THREE.Group();
                 scene.add(plyGroup);
                 var plyParser = new THREE.PLYLoader();
@@ -113,20 +124,29 @@
                 };
                 var loadPly = function(url) { plyParser.load( url, handlePly(url) ); };
 
-                var sum = new THREE.Vector3(0, 0, 0);
-                var Nsum = 0;
+                /* Image loading */
+                function handleImage(name) {
+                    return function(url) {
+                        var texture = textureLoader.load(url);
+                        texture.name = name;
+                        texture.needsUpdate = true;
+                        texMaterial.map = texture;
+                        console.log(name);
+                    };
+                }
+                handleImage('uv')('data/uv.jpg');
+
+                /* Orientation loading */
                 function cameraMesh(camera) {
                     // create the group (looking at intrinsics only) that should be added to the camera frame.
                     var group = new THREE.Group();
 
                     // place a frustum
                     {
-                        if (!camera.projectionMatrixInverse) {
-                            camera.projectionMatrixInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
-                        }
                         var m = camera.projectionMatrixInverse;
                         var geometry = new THREE.BufferGeometry();
                         var vertices = new Float32Array(15);
+                        // get the 4 corners on the near plane (neglecting distortion)
                         new THREE.Vector3( -1, -1, -1 ).applyMatrix4(m).toArray(vertices,  3);
                         new THREE.Vector3( -1,  1, -1 ).applyMatrix4(m).toArray(vertices,  6);
                         new THREE.Vector3(  1,  1, -1 ).applyMatrix4(m).toArray(vertices,  9);
@@ -154,26 +174,6 @@
                     return group;
                 };
 
-                function handleImage(name) {
-                    return function(url) {
-                        var texture = textureLoader.load(url);
-                        texture.name = name;
-                        texture.needsUpdate = true;
-                        texMaterial.map = texture;
-                        console.log(name);
-                    };
-                }
-                handleImage('uv')('data/uv.jpg');
-
-                function updateOrbitTarget(position, delta) {
-                    delta = delta || new THREE.Vector3(10,10,10);
-                    sum.add(position);
-                    Nsum++;
-                    orbitControls.target.copy(sum).divideScalar(Nsum);
-                    orbitControls.object.position.copy(orbitControls.target).add(delta);
-                    orbitControls.saveState();
-                }
-
                 function handleOrientation(name) {
                     return function(camera) {
                         if (!camera) return;
@@ -182,12 +182,14 @@
                         if (camera.check) check = camera.check() ? '[Y]' : '[N]';
                         console.log(check, name, camera);
                         camera.add(cameraMesh(camera));
+                        camera.zoom = 0.9; // zoom out a bit to see the image borders
                         scene.add(camera);
                         cameras.push(camera);
                         updateOrbitTarget(camera.position);
                     };
                 }
-                function parse(options) {
+
+                function parseOrientation(options) {
                     var parsers = [itowns.MicmacOrientationParser, itowns.MatisOrientationParser];
                     return function(xml) {
                         for(const parser of parsers) {
@@ -197,6 +199,33 @@
                         return undefined;
                     }
                 }
+
+                function loadOrientation(path, name, options = {}) {
+                    if (!options.fetch) {
+                        var fetchOptions = options.fetchOptions || { "crossOrigin" : "anonymous" };
+                        path = path || options.path;
+                        options.fetch = url => fetch(path + url, fetchOptions).then(response => response.text());
+                    }
+                    options.fetch(path + name)
+                        .then(parseOrientation(options))
+                        .then(handleOrientation(name));
+                }
+
+                function loadFileImSel(path, dir, options) {
+                    document.getElementById( 'help' ).style.display = 'none';
+                    options = options || {};
+                    options.fetchOptions = options.fetchOptions || { "crossOrigin" : "anonymous" };
+                    options.fetch = options.fetch || (url => fetch(url, options.fetchOptions).then(response => response.text()));
+                    var url = path+dir+'FileImSel.xml';
+                    options.fetch(url)
+                    .then(function (xml) {
+                        xml = new window.DOMParser().parseFromString(xml, 'text/xml');
+                        var names = Array.from(xml.getElementsByTagName('Name'));
+                        names.forEach(name => loadOrientation(path,dir+'Orientation-'+name.childNodes[0].nodeValue.trim()+'.xml', options));
+                    });
+                }
+
+                /* Drag and drop events */
                 function addFiles(event) {
                     var dataTransfer = event.dataTransfer || window.dataTransfer;
                     event.stopPropagation();
@@ -227,7 +256,7 @@
                             return Promise.resolve(undefined);
                         };
                         var name = files[i].name;
-                        var ext = name.substr(name.lastIndexOf('.') + 1);
+                        var ext = name.substr(name.lastIndexOf('.') + 1).toLowerCase();
                         switch (ext) {
                             case 'ply':
                                 read(files[i], 'arrayBuffer')
@@ -237,7 +266,7 @@
                             case 'xml':
                                 var options = { fetch };
                                 read(files[i], 'text')
-                                .then(parse(options))
+                                .then(parseOrientation(options))
                                 .then(handleOrientation(name));
                                 break;
                             case 'jpg':
@@ -252,11 +281,17 @@
                     document.getElementById( 'help' ).style.display = 'none';
                     event.preventDefault();
                 }
+                document.addEventListener('dragenter', prevDefault, false);
+                document.addEventListener('dragover', prevDefault, false);
+                document.addEventListener('dragleave', prevDefault, false);
+                document.addEventListener('drop',  addFiles, false);
                 
+                /* Keyboard events */
                 function setCamera(id) {
                     cameraId = (id + cameras.length) % cameras.length;
                     camera = cameras[cameraId];
                     orbitControls.enabled = cameraId === 0;
+                    onWindowResize();
 /*
                     firstPersonControls.enabled = !orbitControls.enabled;
                     if (firstPersonControls.enabled) {
@@ -276,39 +311,10 @@
                         default : console.log(event.key);
                     }
                 }                
-                document.addEventListener('dragenter', prevDefault, false);
-                document.addEventListener('dragover', prevDefault, false);
-                document.addEventListener('dragleave', prevDefault, false);
-                document.addEventListener('drop',  addFiles, false);
                 document.addEventListener('keydown', keyDown, false);
 
-
-                function loadOrientation(path, name, options = {}) {
-                    if (!options.fetch) {
-                        var fetchOptions = options.fetchOptions || { "crossOrigin" : "anonymous" };
-                        path = path || options.path;
-                        options.fetch = url => fetch(path + url, fetchOptions).then(response => response.text());
-                    }
-                    options.fetch(path + name)
-                        .then(parse(options))
-                        .then(handleOrientation(name));
-                }
-
-                function loadFileImSel(path, dir, options) {
-                    document.getElementById( 'help' ).style.display = 'none';
-                    options = options || {};
-                    options.fetchOptions = options.fetchOptions || { "crossOrigin" : "anonymous" };
-                    options.fetch = options.fetch || (url => fetch(url, options.fetchOptions).then(response => response.text()));
-                    var url = path+dir+'FileImSel.xml';
-                    options.fetch(url)
-                    .then(function (xml) {
-                        xml = new window.DOMParser().parseFromString(xml, 'text/xml');
-                        var names = Array.from(xml.getElementsByTagName('Name'));
-                        names.forEach(name => loadOrientation(path,dir+'Orientation-'+name.childNodes[0].nodeValue.trim()+'.xml', options));
-                    });
-                }
-
-                var base = './';
+                /* hard-coded loading */
+                // var base = './';
                 // loadPly(base + 'Maurepas/Exterieur/AperiCloud_MEP_Campari_v2.ply');
                 // loadOrientation(base + 'Maurepas/Exterieur/2-', 'Ori-MEP_MaurepasExt/Orientation-Maurepas_Ext_3E730.CR2.xml');
                 // loadOrientation(base + 'Maurepas/Exterieur/2-', 'Ori-MEP_MaurepasExt/Orientation-Maurepas_Ext_3E731.CR2.xml');
@@ -327,37 +333,26 @@
                 // loadFileImSel(base + 'Chambord/', 'Ori-MEP_TS/'); // no FileImSel.xml
             }
 
+            /* callbacks */
             function onWindowResize() {
-//                firstPersonControls.handleResize();
-                renderer.setSize( window.innerWidth, window.innerHeight );
+                var width = window.innerWidth;
+                var height = window.innerHeight;
+                // firstPersonControls.handleResize();
+                renderer.setSize(width, height);
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
             }
 
             function animate() {
-/*
-                var delta = clock.getDelta();
-                firstPersonControls.update(delta);
-*/
-                orbitControls.update(); // only required if orbitControls.enableDamping = true, or if orbitControls.autoRotate = true
+                // firstPersonControls.update(clock.getDelta());
+                orbitControls.update();
                 requestAnimationFrame( animate );
                 render();
 
             }
 
             function render() {
-                var cam = camera;
-                if (cameraId > 0) {
-                    cam = cam.clone();
-                    var ratio = cam.aspect * window.innerHeight / window.innerWidth;
-                    if (ratio < 1) {
-                        cam.projectionMatrix.scale(new THREE.Vector3(0.9 * ratio, 0.9, 1));
-                    } else {
-                        cam.projectionMatrix.scale(new THREE.Vector3(0.9, 0.9 / ratio, 1));
-                    }
-                } else {
-                    cam.aspect = window.innerWidth / window.innerHeight;
-                    cam.updateProjectionMatrix();
-                }
-                renderer.render( scene, cam );
+                renderer.render( scene, camera );
             }
 
         </script>

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import Distortion from './Distortion';
+import PhotogrammetricCamera from '../Renderer/ThreeExtended/PhotogrammetricCamera';
 
 function getText(xml, tagName) {
     var node = xml.getElementsByTagName(tagName)[0];
@@ -9,6 +10,14 @@ function getText(xml, tagName) {
 function getNumbers(xml, tagName, value) {
     var text = getText(xml, tagName);
     return text ? text.split(' ').filter(String).map(Number) : value;
+}
+
+function getVector2(xml, tagName, value) {
+    return new THREE.Vector2().fromArray(getNumbers(xml, tagName, value));
+}
+
+function getVector3(xml, tagName, value) {
+    return new THREE.Vector3().fromArray(getNumbers(xml, tagName, value));
 }
 
 function getChildNumbers(xml, tagName) {
@@ -96,38 +105,23 @@ function parseIntrinsics(xml) {
     if (!(xml instanceof Node)) {
         xml = new window.DOMParser().parseFromString(xml, 'text/xml');
     }
-    var camera = new THREE.PerspectiveCamera();
     var KnownConv = getText(xml, 'KnownConv');
     if (KnownConv !== 'eConvApero_DistM2C') {
         throw new Error(`Error parsing micmac orientation : unknown convention ${KnownConv}`);
     }
-    var f = getNumbers(xml, 'F'); // focal length in pixels
-    var p = getNumbers(xml, 'PP'); // image projection center in pixels
-    var distos = xml.getElementsByTagName('CalibDistortion');
+    var focal = getVector2(xml, 'F'); // focal length in pixels
+    var point = getVector2(xml, 'PP'); // image projection center in pixels
+    var size = getVector2(xml, 'SzIm'); // image size in pixels
+    var skew = 0;
     var rmax = getNumbers(xml, 'RayonUtile', [])[0];
-    f[1] = f[1] || f[0]; // fy defaults to fx
-
-    camera.size = getNumbers(xml, 'SzIm'); // image size in pixels
-    camera.distos = Array.from(distos)
+    focal.y = focal.y || focal.x; // fy defaults to fx
+    var distos = Array.from(xml.getElementsByTagName('CalibDistortion'))
         .map(parseDistortion)
         .filter(x => x) // filter undefined values
         .reverse(); // see the doc
-    // projectionMatrix turns metric camera coordinates (three.js conventions: x left, y up, z back) to pixel coordinates (0,0 is top left) and inverse depth (m^-1)
-    camera.preProjectionMatrix = new THREE.Matrix4().set(
-        f[0], 0, -p[0], 0,
-        0, -f[1], -p[1], 0,
-        0, 0, 0, 1,
-        0, 0, -1, 0);
-    camera.aspect = camera.size[0] / camera.size[1];
-    camera.near = f[0] * 0.035 / camera.size[0];
-    camera.far = 1000;
-    var c = (camera.far + camera.near) / (camera.far - camera.near);
-    var d = -2 * camera.far * camera.near / (camera.far - camera.near);
-    camera.postProjectionMatrix = new THREE.Matrix4().set(
-        2 / camera.size[0], 0, 0, -1,
-        0, -2 / camera.size[1], 0, 1,
-        0, 0, d, c,
-        0, 0, 0, 1);
+    var near = focal.x * 0.035 / size.x; // horizontal focal length in meters, assuming a 35mm-wide sensor
+    var far = 1000; // 1km
+    var camera = new PhotogrammetricCamera(focal, size, point, skew, distos, near, far);
     if (rmax) {
         camera.r2max = rmax * rmax;
     }
@@ -159,18 +153,19 @@ function parseConv(xml) {
 
 // https://github.com/micmacIGN/micmac/blob/e0008b7a084f850aa9db4dc50374bd7ec6984da6/src/ori_phot/orilib.cpp#L4127-L4139
 // https://github.com/micmacIGN/micmac/blob/bee473615bec715884aaa639642add0812e8c378/src/uti_files/CPP_Ori_txt2Xml.cpp#L1546-L1600
-function parseExtrinsics(xml, conv) {
+function parseExtrinsics(xml) {
+    var conv = xml.getElementsByTagName('ConvOri')[0];
+    xml = xml.getElementsByTagName('Externe')[0];
     conv = parseConv(xml) || parseConv(conv);
-    var C = getNumbers(xml, 'Centre');
 
-    xml = xml.getElementsByTagName('ParamRotation')[0];
-    var encoding = xml && xml.children[0] ? xml.children[0].tagName : 'No or empty ParamRotation tag';
+    var rotation = xml.getElementsByTagName('ParamRotation')[0];
+    var encoding = rotation && rotation.children[0] ? rotation.children[0].tagName : 'No or empty ParamRotation tag';
     var M = new THREE.Matrix4();
     switch (encoding) {
         case 'CodageMatr':
-            var L1 = getNumbers(xml, 'L1');
-            var L2 = getNumbers(xml, 'L2');
-            var L3 = getNumbers(xml, 'L3');
+            var L1 = getNumbers(rotation, 'L1');
+            var L2 = getNumbers(rotation, 'L2');
+            var L3 = getNumbers(rotation, 'L3');
             M.set(
                 L1[0], L1[1], L1[2], 0,
                 L2[0], L2[1], L2[2], 0,
@@ -180,7 +175,7 @@ function parseExtrinsics(xml, conv) {
 
         case 'CodageAngulaire':
             console.warn('CodageAngulaire has never been tested');
-            var A = getNumbers(xml, 'CodageAngulaire').map(x => x * conv.scale);
+            var A = getNumbers(rotation, 'CodageAngulaire').map(x => x * conv.scale);
             var E = new THREE.Euler(A[0], A[1], A[2], conv.order);
             M.makeRotationFromEuler(E);
             break;
@@ -197,88 +192,73 @@ function parseExtrinsics(xml, conv) {
         }
     }
 
-    // three.js conventions : Y -> -Y, Z -> -Z
-    M.elements[4] = -M.elements[4];
-    M.elements[5] = -M.elements[5];
-    M.elements[6] = -M.elements[6];
-    M.elements[8] = -M.elements[8];
-    M.elements[9] = -M.elements[9];
-    M.elements[10] = -M.elements[10];
+    M.setPosition(getVector3(xml, 'Centre'));
 
-    // setup the translation
-    M.elements[12] = C[0];
-    M.elements[13] = C[1];
-    M.elements[14] = C[2];
+    // go from photogrammetric convention (X right, Y down, Z front) to three.js conventions (X right, Y up, Z back)
+    M.scale(new THREE.Vector3(1, -1, -1));
+
     return M;
 }
 
-function parseInternal(xml) {
-    var C = getNumbers(xml, 'I00');
-    var X = getNumbers(xml, 'V10');
-    var Y = getNumbers(xml, 'V01');
-    if (C[0] === 0 && C[1] === 0 && X[0] === 1 && X[1] === 0 && Y[0] === 0 && Y[1] === 1) {
-        return undefined;
+function parseView(xml) {
+    xml = xml.getElementsByTagName('OrIntImaM2C')[0];
+    if (!xml) return null;
+    var C = getVector2(xml, 'I00');
+    var X = getVector2(xml, 'V10');
+    var Y = getVector2(xml, 'V01');
+    if (C.x === 0 && C.y === 0 && X.x === 1 && X.y === 0 && Y.x === 0 && Y.y === 1) {
+        return null;
     }
-    return new THREE.Matrix4().set(
-            X[0], Y[0], 0, C[0],
-            X[1], Y[1], 0, C[1],
-            0, 0, 1, 0,
-            0, 0, 0, 1);
+    console.warning('Not sure about the OrIntImaM2C -> THREE/offsetViewWithSkew conversion');
+    return {
+        enabled: true,
+        fullWidth: X.x,
+        fullHeight: Y.y,
+        offsetX: -C.x * X.x,
+        offsetY: -C.y * Y.y,
+        skewX: Y.x * X.x,
+        skewY: X.y * Y.y,
+        width: 1,
+        height: 1,
+    };
+}
+
+function parseCheck(xml) {
+    xml = xml.getElementsByTagName('Verif')[0];
+    if (!xml) return undefined;
+    function check(epsilon, N) {
+        epsilon = epsilon || this.check.epsilon;
+        var array = N ? this.check.points.slice(0, N) : this.check.points;
+        return array.reduce((ok, point) => {
+            var pp = this.distort(point.p3.clone());
+            var d = point.p2.distanceTo(pp);
+            if (d > epsilon) {
+                ok = false;
+                console.warn(point.id, d, pp, point.p2, point.p3);
+            }
+            return ok;
+        }, true);
+    }
+    check.epsilon = getNumbers(xml, 'Tol')[0];
+    check.points = Array.from(xml.getElementsByTagName('Appuis')).map(point => ({
+        id: getNumbers(point, 'Num')[0],
+        p2: getVector2(point, 'Im'),
+        p3: getVector3(point, 'Ter'),
+    }));
+    return check;
 }
 
 function parseOrientation(xml, intrinsics) {
-    var extrinsics = xml.getElementsByTagName('Externe')[0];
-    var internal = xml.getElementsByTagName('OrIntImaM2C')[0];
-    var verif = xml.getElementsByTagName('Verif')[0];
-    var conv = xml.getElementsByTagName('ConvOri')[0];
     var camera = parseIntrinsics(intrinsics);
-    camera.matrix = parseExtrinsics(extrinsics, conv);
-    internal = parseInternal(internal);
+
+    camera.view = parseView(xml);
+    camera.updateProjectionMatrix();
+
+    camera.matrix = parseExtrinsics(xml);
     camera.matrix.decompose(camera.position, camera.quaternion, camera.scale);
-    // camera.matrixAutoUpdate = false;
     camera.updateMatrixWorld(true);
-    if (internal) {
-        camera.matrixImage = internal;
-        camera.postProjectionMatrix.multiply(camera.matrixImage);
-    }
-    camera.uvProjectionMatrix = new THREE.Matrix4().set(
-        1, 0, 0, 1,
-        0, 1, 0, 1,
-        0, 0, 2, 0,
-        0, 0, 0, 2).multiply(camera.postProjectionMatrix);
-    // exact transform is : matrixWorldInverse -> preProjectionMatrix -> distos -> postProjectionMatrix
-    // projectionMatrix neglects distos in : preProjectionMatrix -> (distos) -> postProjectionMatrix
-    camera.projectionMatrix.multiplyMatrices(camera.postProjectionMatrix, camera.preProjectionMatrix);
-    camera.projectionMatrixInverse = new THREE.Matrix4().getInverse(camera.projectionMatrix);
-    camera.project = function project(p, skipImage) {
-        p.applyMatrix4(this.matrixWorldInverse);
-        p.applyMatrix4(this.preProjectionMatrix);
-        p = this.distos.reduce((q, disto) => disto.project(q), p);
-        if (this.matrixImage && !skipImage) {
-            p.applyMatrix4(this.matrixImage);
-        }
-        return p;
-    };
-    if (verif) {
-        camera.checkEpsilon = getNumbers(verif, 'Tol')[0];
-        camera.check = function check(epsilon, N) {
-            epsilon = epsilon || this.checkEpsilon;
-            var array = Array.from(verif.getElementsByTagName('Appuis'));
-            if (N) array = array.slice(0, N);
-            return array.reduce((ok, point) => {
-                var id = getNumbers(point, 'Num')[0];
-                var p2 = new THREE.Vector2().fromArray(getNumbers(point, 'Im'));
-                var p3 = new THREE.Vector3().fromArray(getNumbers(point, 'Ter'));
-                var pp = camera.project(p3.clone(), true);
-                var d = p2.distanceTo(pp);
-                if (d > epsilon) {
-                    ok = false;
-                    console.warn(id, d, pp, p2, p3);
-                }
-                return ok;
-            }, true);
-        };
-    }
+
+    camera.check = parseCheck(xml);
     return camera;
 }
 
@@ -297,6 +277,7 @@ export default {
         if (!(xml instanceof Node)) {
             xml = new window.DOMParser().parseFromString(xml, 'text/xml');
         }
+        // sanity check for format
         xml = xml.getElementsByTagName('OrientationConique')[0];
         if (!xml) return undefined;
 
@@ -307,8 +288,7 @@ export default {
         }
 
         if (file) {
-            var promise = options.fetch(file, 'text');
-            return promise.then(intrinsics => parseOrientation(xml, intrinsics));
+            return options.fetch(file, 'text').then(intrinsics => parseOrientation(xml, intrinsics));
         } else {
             var intrinsics = xml.getElementsByTagName('Interne')[0];
             return Promise.resolve(parseOrientation(xml, intrinsics));
