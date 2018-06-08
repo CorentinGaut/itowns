@@ -86,10 +86,6 @@ class OrientedImageMaterial extends THREE.RawShaderMaterial {
         this.group.position.copy(feature.position);
         this.group.quaternion.copy(feature.quaternion);
         this.group.updateMatrixWorld(true); // update the matrixWorldInverse of the cameras
-        if (this.helpers) {
-            // todo: move this to OrientedImageDebug
-            this.helpers.updateMatrixWorld(true); // update the matrixWorld of the helpers
-        }
         for (let i = 0; i < textures.length; ++i) {
             var oldTexture = this.uniforms.projectiveTexture.value[i];
             this.uniforms.projectiveTexture.value[i] = textures[i];

@@ -1,4 +1,4 @@
-import { Group, CameraHelper, AxesHelper } from 'three';
+import { Group, CameraHelper, AxesHelper, Matrix4 } from 'three';
 
 function createAxisHelpers(poses, size = 0.5, visible = false) {
     const helpers = new Group();
@@ -16,8 +16,11 @@ function createCameraHelpers(cameras, visible = true) {
     var helpers = new Group();
     helpers.visible = visible;
     for (const camera of cameras) {
-        const helper = new CameraHelper(camera);
-        helpers.add(helper);
+        const helper = new AxesHelper(1); // Spherenew CameraHelper(camera);
+        helper.matrix = new Matrix4();
+        camera.helper = helper;
+        camera.add(helper);
+        helpers.add(camera);
     }
     return helpers;
 }
@@ -25,8 +28,8 @@ function createCameraHelpers(cameras, visible = true) {
 export default {
     initTools(view, layer, datUi) {
         layer.axisHelpers = createAxisHelpers(layer.poses);
-        layer.material.helpers = createCameraHelpers(layer.cameras);
-        layer.object3d.add(layer.material.helpers);
+        layer.cameraHelpers = createCameraHelpers(layer.cameras);
+        layer.object3d.add(layer.cameraHelpers);
         layer.object3d.add(layer.axisHelpers);
         layer.object3d.updateMatrixWorld(true);
 
@@ -34,23 +37,25 @@ export default {
         function updateCamera() {
             const camera = this.object.isCamera ? this.object : this.object.camera;
             if (this.object === camera) {
+                camera.updateMatrixWorld(true);
                 camera.updateProjectionMatrix();
-                layer.material.helpers.traverse(helper => helper.camera === camera && helper.update());
+                if (camera.helper.update) {
+                    camera.helper.update();
+                }
             } else if (this.object === camera.quaternion) {
                 this.object.normalize();
             }
             camera.needsUpdate = true;
             layer.material.group.updateMatrixWorld(true);
-            layer.material.helpers.updateMatrixWorld(true);
             view.notifyChange(true);
         }
-        layer.debugUI = datUi.addFolder(`${layer.id}`);
+        layer.debugUI = datUi.addFolder(layer.id);
 
         const axisUI = layer.debugUI.addFolder('Axes');
         axisUI.add(layer.axisHelpers, 'visible').name('Display Axis Helpers').onChange(update);
 
         const camerasUI = layer.debugUI.addFolder('Cameras');
-        camerasUI.add(layer.material.helpers, 'visible').name('Display Camera Helpers').onChange(update);
+        camerasUI.add(layer.cameraHelpers, 'visible').name('Display Camera Helpers').onChange(update);
         for (const camera of layer.cameras) {
             const cameraUI = camerasUI.addFolder(camera.name);
 
