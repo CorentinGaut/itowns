@@ -32,8 +32,6 @@ function initNodeImageryTexturesFromParent(node, parent, layer) {
                 console.error(`non-coherent result ${textureIndex} ${offsetTextures} vs ${coords.length}.`, coords);
             }
         }
-        const index = node.material.indexOfColorLayer(layer.id);
-        node.material.layerTexturesCount[index] = coords.length;
         node.material.loadedTexturesCount[l_COLOR] += coords.length;
     }
 }

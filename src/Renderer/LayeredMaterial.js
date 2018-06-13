@@ -117,11 +117,9 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
     this.textures[l_ELEVATION] = [emptyTexture];
     this.textures[l_COLOR] = Array(nbSamplers);
     this.paramLayers = Array(nbLayers);
-    this.layerTexturesCount = Array(nbLayers);
 
     fillArray(this.textures[l_COLOR], emptyTexture);
     fillArray(this.paramLayers, {});
-    fillArray(this.layerTexturesCount, 0);
 
 
     this.noTextureColor = new THREE.Color(0.04, 0.23, 0.35);
@@ -175,8 +173,8 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
                     continue;
                 }
 
-                const offset = this.getTextureOffsetByLayerIndex(index);
-                const count = this.getTextureCountByLayerIndex(index);
+                const offset = this.paramLayers[index].textureOffset;
+                const count = this.paramLayers[index].textureCount;
                 let total = 0;
                 for (let i = 0; i < this.loadedTexturesCount[1]; i++) {
                     if (!this.uniforms.dTextures_01.value[i].image) {
@@ -250,23 +248,23 @@ LayeredMaterial.prototype.setSequence = function setSequence(sequenceLayer) {
         const oldIndex = this.indexOfColorLayer(layer);
         if (oldIndex > -1) {
             const newIndex = l - layerOffset;
-            const texturesCount = this.layerTexturesCount[oldIndex];
+            const textureCount = this.paramLayers[oldIndex].textureCount;
+            const oldOffset = this.paramLayers[oldIndex].textureOffset;
 
             // individual values are swapped in place
             if (newIndex !== oldIndex) {
-                moveElementArray(this.layerTexturesCount, oldIndex, newIndex);
                 moveElementArray(this.paramLayers, oldIndex, newIndex);
             }
-            const oldOffset = this.getTextureOffsetByLayerIndex(newIndex);
+
             // consecutive values are copied from original
-            for (let i = 0; i < texturesCount; i++) {
+            for (let i = 0; i < textureCount; i++) {
                 this.uniforms.offsetScale_L01.value[textureOffset + i] = originalOffsets[oldOffset + i];
                 this.uniforms.dTextures_01.value[textureOffset + i] = originalTextures[oldOffset + i];
             }
 
             this.uniforms.colorLayersCount.value = newIndex + 1;
             this.paramLayers[newIndex].textureOffset = textureOffset;
-            textureOffset += texturesCount;
+            textureOffset += textureCount;
         } else {
             layerOffset++;
         }
@@ -280,15 +278,11 @@ LayeredMaterial.prototype.removeColorLayer = function removeColorLayer(layer) {
         return;
     }
 
-    const offset = this.getTextureOffsetByLayerIndex(layerIndex);
-    const texturesCount = this.getTextureCountByLayerIndex(layerIndex);
+    const offset = this.paramLayers[layerIndex].textureOffset;
+    const texturesCount = this.paramLayers[layerIndex].textureCount;
 
     // remove layer
     this.uniforms.colorLayersCount.value--;
-
-    // remove nb textures
-    this.layerTexturesCount.splice(layerIndex, 1);
-    this.layerTexturesCount.push(0);
 
     // Remove Layers Parameters
     var param = this.paramLayers.splice(layerIndex, 1)[0];
@@ -360,18 +354,20 @@ LayeredMaterial.prototype.setColorLayerParameters = function setColorLayerParame
 
 LayeredMaterial.prototype.pushLayer = function pushLayer(param) {
     const newIndex = this.getColorLayersCount();
-    const textureOffset = newIndex === 0 ? 0 : this.getTextureOffsetByLayerIndex(newIndex - 1) + this.getTextureCountByLayerIndex(newIndex - 1);
+    var textureOffset = 0;
+    if (newIndex > 0) {
+        textureOffset = this.paramLayers[newIndex - 1].textureOffset + this.paramLayers[newIndex - 1].textureCount;
+    }
     // If there's only one texture: assume it covers the whole tile,
     // otherwise declare the number of textures
     this.paramLayers[newIndex] = {
         id: param.idLayer,
         textureOffset,
-        textureCount: (param.texturesCount == 1) ? 0 : param.texturesCount,
+        textureCount: param.texturesCount,
         effect: param.fx,
         opacity: param.opacity,
         visible: param.visible,
     };
-    this.layerTexturesCount[newIndex] = param.texturesCount;
     this.uniforms.colorLayersCount.value = newIndex + 1;
 };
 
@@ -389,10 +385,6 @@ LayeredMaterial.prototype.getColorLayersCount = function getColorLayersCount() {
 
 LayeredMaterial.prototype.getTextureOffsetByLayerIndex = function getTextureOffsetByLayerIndex(index) {
     return this.paramLayers[index].textureOffset;
-};
-
-LayeredMaterial.prototype.getTextureCountByLayerIndex = function getTextureCountByLayerIndex(index) {
-    return this.layerTexturesCount[index];
 };
 
 LayeredMaterial.prototype.getLayerTextureOffset = function getLayerTextureOffset(layerId) {
@@ -428,9 +420,9 @@ LayeredMaterial.prototype.getLayerTextures = function getLayerTextures(layerType
     const index = this.indexOfColorLayer(layerId);
 
     if (index !== -1) {
-        const count = this.getTextureCountByLayerIndex(index);
-        const textureIndex = this.getTextureOffsetByLayerIndex(index);
-        return this.textures[l_COLOR].slice(textureIndex, textureIndex + count);
+        const offset = this.paramLayers[index].textureOffset;
+        const count = this.paramLayers[index].textureCount;
+        return this.textures[l_COLOR].slice(offset, offset + count);
     } else {
         throw new Error(`Invalid layer id "${layerId}"`);
     }

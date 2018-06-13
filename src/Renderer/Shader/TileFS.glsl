@@ -126,11 +126,10 @@ void main() {
             break;
         }
         Layer param = paramLayers[layer];
-        bool projWGS84 = param.textureCount == 0;
-        int textureCount = param.textureCount < 1 ? 1 : param.textureCount;
+        bool projWGS84 = param.textureCount == 1;
         int subTextureIndex = projWGS84 ? 0 : pmSubTextureIndex;
         vec4 layerColor = vec4(0.);
-        if( param.visible && param.opacity > 0. && subTextureIndex < textureCount) {
+        if( param.visible && param.opacity > 0. && subTextureIndex < param.textureCount) {
             vec2 uv = projWGS84 ? uvWGS84 : uvPM;
             int textureIndex = param.textureOffset + subTextureIndex;
             #pragma unroll_loop
