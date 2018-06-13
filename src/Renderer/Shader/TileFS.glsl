@@ -14,13 +14,13 @@ const vec4 COrange = vec4( 1.0, 0.3, 0.0, 1.0);
 const vec4 CRed = vec4( 1.0, 0.0, 0.0, 1.0);
 
 
-uniform sampler2D   dTextures_01[TEX_UNITS];
-uniform vec4        offsetScale_L01[TEX_UNITS];
+uniform sampler2D   dTextures_01[NUM_TEXTURES];
+uniform vec4        offsetScale_L01[NUM_TEXTURES];
 
 // offset texture | Projection | fx | Opacity
-uniform vec4        paramLayers[8];
-uniform int         loadedTexturesCount[8];
-uniform bool        visibility[8];
+uniform vec4        paramLayers[NUM_LAYERS];
+uniform int         loadedTexturesCount[NUM_LAYERS];
+uniform bool        visibility[NUM_LAYERS];
 
 uniform float       distanceFog;
 uniform int         colorLayersCount;
@@ -61,133 +61,98 @@ vec4 applyLightColorToInvisibleEffect(vec4 color, float intensity) {
 uniform int  uuid;
 #endif
 
-vec4 textureOffsetScale(sampler2D texture[TEX_UNITS],vec4 offsetScale[TEX_UNITS], vec2 uv, int id){
-    #pragma unroll_loop
-    for ( int i = 0; i < TEX_UNITS; i ++ ) {
-        if ( id == i ) return texture2D(texture[ i ], pitUV(uv, offsetScale[ i ]));
+vec4 getLayerColor(sampler2D texture,vec4 offsetScale, vec2 uv, vec4 param) {
+    vec4 color = texture2D(texture, pitUV(uv, offsetScale));
+    if(color.a > 0.0) {
+        if(param.z > 2.0) {
+            color.rgb /= color.a;
+            color = applyLightColorToInvisibleEffect(color, param.z);
+            color.rgb *= color.a;
+        } else if(param.z > 0.0) {
+            color.rgb /= color.a;
+            color = applyWhiteToInvisibleEffect(color, param.z);
+            color.rgb *= color.a;
+        }
     }
-    return vec4(0.);
+    return color * param.w;
 }
 
 
 void main() {
     #include <logdepthbuf_fragment>
 
-    #if defined(MATTE_ID_MODE)
-        gl_FragColor = packDepthToRGBA(float(uuid) / (256.0 * 256.0 * 256.0));
-    #elif defined(DEPTH_MODE)
-        #if defined(USE_LOGDEPTHBUF) && defined(USE_LOGDEPTHBUF_EXT)
-            float z = gl_FragDepthEXT ;
-        #else
-            float z = gl_FragCoord.z;
-        #endif
-        gl_FragColor = packDepthToRGBA(z);
-    #else
+#if defined(MATTE_ID_MODE)
 
+    gl_FragColor = packDepthToRGBA(float(uuid) / (256.0 * 256.0 * 256.0));
 
+#elif defined(DEPTH_MODE)
+
+  #if defined(USE_LOGDEPTHBUF) && defined(USE_LOGDEPTHBUF_EXT)
+    float z = gl_FragDepthEXT ;
+  #else
+    float z = gl_FragCoord.z;
+  #endif
+    gl_FragColor = packDepthToRGBA(z);
+
+#else
+
+    // Reconstruct PM uv and PM subtexture id (see TileGeometry)
+    vec2 uvWGS84 = vUv_WGS84;
+    vec2 uvPM    = vUv_WGS84;
+    float y      = floor(vUv_PM);
+    uvPM.y       = vUv_PM - y;
+    int pmSubTextureIndex = int(y);
+    
     #if defined(DEBUG)
-         if (showOutline && (vUv_WGS84.x < sLine || vUv_WGS84.x > 1.0 - sLine || vUv_WGS84.y < sLine || vUv_WGS84.y > 1.0 - sLine))
-             gl_FragColor = CRed;
-         else
+    if (showOutline) {
+        if (uvWGS84.x < sLine || 1.0 - uvWGS84.x < sLine || uvWGS84.y < sLine || 1.0 - uvWGS84.y < sLine) {
+            gl_FragColor = CRed;
+            return;
+        } else if (uvPM.x < sLine || 1.0 - uvPM.x < sLine || uvPM.y < sLine || 1.0 - uvPM.y < sLine) {
+            gl_FragColor = COrange;
+            return;
+        }
+    }
     #endif
-    {
-        // Reconstruct PM uv and PM subtexture id (see TileGeometry)
-        vec2 uvPM ;
-        uvPM.x             = vUv_WGS84.x;
-        float y            = vUv_PM;
-        int pmSubTextureIndex = int(floor(y));
-        uvPM.y             = y - float(pmSubTextureIndex);
 
-        #if defined(USE_LOGDEPTHBUF) && defined(USE_LOGDEPTHBUF_EXT)
-            float depth = gl_FragDepthEXT / gl_FragCoord.w;
-        #else
-            float depth = gl_FragCoord.z / gl_FragCoord.w;
-        #endif
-
-        float fogIntensity = 1.0/(exp(depth/distanceFog));
-
-        vec4 diffuseColor = vec4(noTextureColor, 1.0);
-        bool validTexture = false;
-
-        // TODO Optimisation des uv1 peuvent copier pas lignes!!
-        for (int layer = 0; layer < 8; layer++) {
-            if(layer == colorLayersCount) {
-                break;
+    vec4 diffuseColor = vec4(noTextureColor, 1.0);
+    for (int layer = 0; layer < NUM_LAYERS; layer++) {
+        if(layer == colorLayersCount) {
+            break;
+        }
+        vec4 param = paramLayers[layer];
+        bool projWGS84 = param.y == 0.0;
+        int pmTextureCount = int(param.y);
+        vec4 layerColor = vec4(0.);
+        if( visibility[layer] && param.w > 0.0 && (projWGS84 || pmSubTextureIndex < pmTextureCount) ) {
+            vec2 uv = projWGS84 ? uvWGS84 : uvPM;
+            int textureIndex = int(param.x) + (projWGS84 ? 0 : pmSubTextureIndex);
+            #pragma unroll_loop
+            for ( int i = 0; i < NUM_TEXTURES; i ++ ) {
+                if ( textureIndex == i ) layerColor = getLayerColor(dTextures_01[ i ], offsetScale_L01[ i ], uv, param);
             }
-
-            if(visibility[layer]) {
-                vec4 paramsA = paramLayers[layer];
-
-                if(paramsA.w > 0.0) {
-                    bool projWGS84 = paramsA.y == 0.0;
-                    int pmTextureCount = int(paramsA.y);
-                    int textureIndex = int(paramsA.x) + (projWGS84 ? 0 : pmSubTextureIndex);
-
-                    if (!projWGS84 && pmTextureCount <= pmSubTextureIndex) {
-                        continue;
-                    }
-
-                    #if defined(DEBUG)
-                    if (showOutline && !projWGS84 && (uvPM.x < sLine || uvPM.x > 1.0 - sLine || uvPM.y < sLine || uvPM.y > 1.0 - sLine)) {
-                        gl_FragColor = COrange;
-                        return;
-                    }
-                    #endif
-
-                    /* if (0 <= textureIndex && textureIndex < loadedTexturesCount[1]) */ {
-
-                        // TODO: Try other OS before delete dead
-                        // get value in array, the index must be constant
-                        // Strangely it's work with function returning a global variable, doesn't work on Chrome Windows
-                        // vec4 layerColor = texture2D(dTextures_01[getTextureIndex()],  pitUV(projWGS84 ? vUv_WGS84 : uvPM,pitScale_L01[getTextureIndex()]));
-                        vec4 layerColor = textureOffsetScale(
-                            dTextures_01,
-                            offsetScale_L01,
-                            projWGS84 ? vUv_WGS84 : uvPM,
-                            textureIndex);
-
-                        if (layerColor.a > 0.0 && paramsA.w > 0.0) {
-                            validTexture = true;
-                            if(paramsA.z > 2.0) {
-                                layerColor.rgb /= layerColor.a;
-                                layerColor = applyLightColorToInvisibleEffect(layerColor, paramsA.z);
-                                layerColor.rgb *= layerColor.a;
-                            } else if(paramsA.z > 0.0) {
-                                layerColor.rgb /= layerColor.a;
-                                layerColor = applyWhiteToInvisibleEffect(layerColor, paramsA.z);
-                                layerColor.rgb *= layerColor.a;
-                            }
-
-                            // Use premultiplied-alpha blending formula because source textures are either:
-                            //     - fully opaque (layer.transparent = false)
-                            //     - or use premultiplied alpha (texture.premultiplyAlpha = true)
-                            // Note: using material.premultipliedAlpha doesn't make sense since we're manually blending
-                            // the multiple colors in the shader.
-                            diffuseColor = diffuseColor * (1.0 - layerColor.a * paramsA.w) + layerColor * paramsA.w;
-                        }
-                    }
-                }
-            }
+            diffuseColor = layerColor + diffuseColor * (1.0 - layerColor.a);
         }
+    }
 
-        // No texture color
-        if (!validTexture) {
-            diffuseColor.rgb = noTextureColor;
-        }
+    // Selected
+    if(selected) {
+        diffuseColor = mix(COrange, diffuseColor, 0.5 );
+    }
 
-        // Selected
-        if(selected) {
-            diffuseColor = mix(COrange, diffuseColor, 0.5 );
-        }
+    // Fog
+    #if defined(USE_LOGDEPTHBUF) && defined(USE_LOGDEPTHBUF_EXT)
+        float depth = gl_FragDepthEXT / gl_FragCoord.w;
+    #else
+        float depth = gl_FragCoord.z / gl_FragCoord.w;
+    #endif
+    float fogIntensity = 1.0/(exp(depth/distanceFog));
+    gl_FragColor = mix(CFog, diffuseColor, fogIntensity);
+    gl_FragColor.a = 1.0;
 
-        // Fog
-        gl_FragColor = mix(CFog, diffuseColor, fogIntensity);
-        gl_FragColor.a = 1.0;
-
-        if(lightingEnabled) {   // Add lighting
-            float light = min(2. * dot(vNormal, lightPosition),1.);
-            gl_FragColor.rgb *= light;
-        }
+    if(lightingEnabled) {   // Add lighting
+        float light = min(2. * dot(vNormal, lightPosition),1.);
+        gl_FragColor.rgb *= light;
     }
     gl_FragColor.a = opacity;
     #endif

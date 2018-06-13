@@ -74,7 +74,8 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
     const maxTexturesUnits = Capabilities.getMaxTextureUnitsCount();
     const nbSamplers = Math.min(maxTexturesUnits - 1, 16 - 1);
 
-    this.defines.TEX_UNITS = nbSamplers;
+    this.defines.NUM_TEXTURES = nbSamplers;
+    this.defines.NUM_LAYERS = 8;
 
     if (__DEBUG__) {
         this.defines.DEBUG = 1;
