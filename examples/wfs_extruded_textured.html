@@ -1,0 +1,134 @@
+<html>
+    <head>
+        <title>Itowns - WFS (geojson) example</title>
+
+        <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+        <link rel="stylesheet" type="text/css" href="css/loading_screen.css">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <div class="help">
+            <p>Key bindings</p>
+            <ul>
+              <li>Left-Click: camera translation (drag)</li>
+              <li>Right-Click: camera translation (pan)</li>
+              <li>Ctrl + Left-Click: camera rotation (orbit)</li>
+              <li>Spacebar / Wheel-Click: smart zoom</li>
+              <li>Mouse Wheel: zoom in/out</li>
+              <li>T: orient camera to a top view</li>
+              <li>Y: move camera to start position</li>
+            </ul>
+        </div>
+        <div id="viewerDiv"></div>
+        <div class="help" style="left: unset; right: 0;">
+            <p><b>Information Batiment</b></p>
+            <ul id="info">
+            </ul>
+        </div>
+        <script src="../dist/itowns.js"></script>
+        <script src="js/loading_screen.js"></script>
+        <script type="text/javascript">
+            var extent;
+            var viewerDiv;
+            var view;
+            var meshes;
+
+            // Define projection that we will use (taken from https://epsg.io/3946, Proj4js section)
+            itowns.proj4.defs('EPSG:3946',
+                '+proj=lcc +lat_1=45.25 +lat_2=46.75 +lat_0=46 +lon_0=3 +x_0=1700000 +y_0=5200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+            itowns.proj4.defs('EPSG:2154',
+                '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+
+            // Define geographic extent: CRS, min/max X, min/max Y
+            extent = new itowns.Extent(
+                'EPSG:3946',
+                1837816.94334, 1847692.32501,
+                5170036.4587, 5178412.82698);
+
+            // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
+            viewerDiv = document.getElementById('viewerDiv');
+
+            // Instanciate PlanarView*
+            view = new itowns.PlanarView(viewerDiv, extent);
+            setupLoadingScreen(viewerDiv, view);
+            view.tileLayer.disableSkirt = true;
+
+            function colorBuildings(properties) {
+                if (properties.id.indexOf('bati_remarquable') === 0) {
+                    return new itowns.THREE.Color(0x5555ff);
+                } else if (properties.id.indexOf('bati_industriel') === 0) {
+                    return new itowns.THREE.Color(0xff5555);
+                }
+                return new itowns.THREE.Color(0xeeeeee);
+            }
+
+            function altitudeBuildings(properties) {
+                return properties.z_min - properties.hauteur - 3;
+            }
+
+            function extrudeBuildings(properties) {
+                return properties.hauteur + 10;
+            }
+
+            // Add an WMS imagery layer (see WMSProvider* for valid options)
+            view.addLayer({
+                type: 'geometry',
+                update: itowns.FeatureProcessing.update,
+                convert: itowns.Feature2Mesh.convert({
+                    color: colorBuildings,
+                    altitude: altitudeBuildings,
+                    extrude: extrudeBuildings }),
+                // onMeshCreated: (mesh) => mesh.traverse(object => object.material = material),
+                url: 'http://wxs.ign.fr/72hpsel8j8nhb5qgdh07gcyp/geoportail/wfs?',
+                protocol: 'wfs',
+                version: '2.0.0',
+                id: 'wfsBuilding',
+                typeName: 'BDTOPO_BDD_WLD_WGS84G:bati_remarquable,BDTOPO_BDD_WLD_WGS84G:bati_indifferencie,BDTOPO_BDD_WLD_WGS84G:bati_industriel',
+                level: 16,
+                projection: 'EPSG:4326',
+                extent: {
+                    west: 2.334,
+                    east: 2.335,
+                    south: 48.849,
+                    north: 48.851,
+                },
+                ipr: 'IGN',
+                format: 'json',
+            });
+
+            view.camera.camera3D.position.set(1839739, 5171618, 910);
+            view.camera.camera3D.lookAt(new itowns.THREE.Vector3(1840839, 5172718, 0));
+
+            // eslint-disable-next-line no-new
+            new itowns.PlanarControls(view, {});
+
+            // Request redraw
+            view.notifyChange(true);
+
+            /* global, document, window, view */
+            function picking(event) {
+                var htmlInfo = document.getElementById('info');
+                var intersects = view.pickObjectsAt(event, 'wfsBuilding');
+                var properties;
+                var info;
+                htmlInfo.innerHTML = ' ';
+
+                if (intersects.length) {
+                    properties = intersects[0].object.properties;
+                    Object.keys(properties).map(function (objectKey) {
+                        var value = properties[objectKey];
+                        var key = objectKey.toString();
+                        if (key[0] !== '_' && key !== 'geometry_name') {
+                            info = value.toString();
+                            htmlInfo.innerHTML +='<li><b>' + key + ': </b>' + info + '</li>';
+                        }
+                    });
+                }
+            }
+
+            window.addEventListener('mousemove', picking, false);
+        </script>
+    </body>
+</html>

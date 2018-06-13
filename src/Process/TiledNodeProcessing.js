@@ -66,10 +66,16 @@ function subdivideNode(context, layer, node) {
                 node.add(child);
                 child.updateMatrixWorld(true);
 
-                child.material.uniforms.lightPosition.value =
-                    node.material.uniforms.lightPosition.value;
-                child.material.uniforms.lightingEnabled.value =
-                    node.material.uniforms.lightingEnabled.value;
+                if (child.material.uniforms) {
+                    if (child.material.uniforms.lightPosition) {
+                        child.material.uniforms.lightPosition.value =
+                            node.material.uniforms.lightPosition.value;
+                    }
+                    if (child.material.uniforms.lightingEnabled) {
+                        child.material.uniforms.lightingEnabled.value =
+                            node.material.uniforms.lightingEnabled.value;
+                    }
+                }
             }
             // TODO
             /*
@@ -121,8 +127,8 @@ export function processTiledGeometryNode(cullingTest, subdivisionTest) {
 
             if (node.material.visible) {
                 // update uniforms
-                if (context.view.fogDistance != undefined) {
-                    node.setFog(context.view.fogDistance);
+                if (node.material.setFogDistance && context.view.fogDistance != undefined) {
+                    node.material.setFogDistance(context.view.fogDistance);
                 }
 
                 if (!requestChildrenUpdate) {

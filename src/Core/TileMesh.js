@@ -112,10 +112,6 @@ TileMesh.prototype.pushRenderState = function pushRenderState(state) {
     };
 };
 
-TileMesh.prototype.setFog = function setFog(fog) {
-    this.material.setFogDistance(fog);
-};
-
 TileMesh.prototype.setSelected = function setSelected(select) {
     this.material.setSelected(select);
 };

@@ -1,6 +1,6 @@
 import { Group, CameraHelper, AxesHelper } from 'three';
 
-function createAxisHelpers(poses, size = 0.5, visible = false) {
+function createAxisHelpers(poses, visible, size = 0.5) {
     const helpers = new Group();
     helpers.visible = visible;
     for (const pose of poses) {
@@ -12,7 +12,7 @@ function createAxisHelpers(poses, size = 0.5, visible = false) {
     return helpers;
 }
 
-function createCameraHelpers(cameras, visible = true) {
+function createCameraHelpers(cameras, visible) {
     var helpers = new Group();
     helpers.visible = visible;
     for (const camera of cameras) {
@@ -24,8 +24,8 @@ function createCameraHelpers(cameras, visible = true) {
 
 export default {
     initTools(view, layer, datUi) {
-        layer.axisHelpers = createAxisHelpers(layer.poses);
-        layer.material.helpers = createCameraHelpers(layer.cameras);
+        layer.axisHelpers = createAxisHelpers(layer.poses, layer.axisHelpers);
+        layer.material.helpers = createCameraHelpers(layer.cameras, layer.cameraHelpers);
         layer.object3d.add(layer.material.helpers);
         layer.object3d.add(layer.axisHelpers);
         layer.object3d.updateMatrixWorld(true);

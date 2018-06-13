@@ -158,8 +158,8 @@ PlanarView.prototype.selectNodeAt = function selectNodeAt(mouse) {
     for (const n of this.tileLayer.level0Nodes) {
         n.traverse((node) => {
             // only take of selectable nodes
-            if (node.setSelected) {
-                node.setSelected(node.id === selectedId);
+            if (node.material.setSelected) {
+                node.material.setSelected(node.id === selectedId);
 
                 if (node.id === selectedId) {
                     // eslint-disable-next-line no-console

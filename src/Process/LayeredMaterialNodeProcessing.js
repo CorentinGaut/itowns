@@ -167,7 +167,7 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
             }
         }
 
-        if (material.indexOfColorLayer(layer.id) === -1) {
+        if (material.indexOfColorLayer && material.indexOfColorLayer(layer.id) === -1) {
             const texturesCount =
                 node.getCoordsForLayer(layer).length;
 
@@ -195,7 +195,7 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
         // The two-step allows you to filter out unnecessary requests
         // Indeed in the second pass, their state (not visible or not displayed) can block them to fetch
         const minLevel = layer.options.zoom ? layer.options.zoom.min : 0;
-        if (node.material.getColorLayerLevelById(layer.id) >= minLevel) {
+        if (node.material.getColorLayerLevelById && node.material.getColorLayerLevelById(layer.id) >= minLevel) {
             context.view.notifyChange(false, node);
             return;
         }

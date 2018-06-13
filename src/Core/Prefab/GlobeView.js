@@ -77,9 +77,13 @@ export const GLOBE_VIEW_EVENTS = {
 export function createGlobeLayer(id, options) {
     // Configure tiles
     const nodeInitFn = function nodeInitFn(layer, parent, node) {
-        node.material.setLightingOn(layer.lighting.enable);
-        node.material.uniforms.lightPosition.value = layer.lighting.position;
-        if (layer.noTextureColor) {
+        if (node.material.setLightingOn) {
+            node.material.setLightingOn(layer.lighting.enable);
+        }
+        if (node.material.uniforms && node.material.uniforms.lightPosition) {
+            node.material.uniforms.lightPosition.value = layer.lighting.position;
+        }
+        if (node.material.uniforms && node.material.uniforms.noTextureColor && layer.noTextureColor) {
             node.material.uniforms.noTextureColor.value.copy(layer.noTextureColor);
         }
 
@@ -150,7 +154,7 @@ export function createGlobeLayer(id, options) {
 
     wgs84TileLayer.update = processTiledGeometryNode(globeCulling(2), subdivision);
     wgs84TileLayer.builder = new BuilderEllipsoidTile();
-    wgs84TileLayer.onTileCreated = nodeInitFn;
+    wgs84TileLayer.onTileCreated = options.onTileCreated || nodeInitFn;
     wgs84TileLayer.type = 'geometry';
     wgs84TileLayer.protocol = 'tile';
     wgs84TileLayer.visible = true;
@@ -355,8 +359,8 @@ GlobeView.prototype.selectNodeAt = function selectNodeAt(mouse) {
     for (const n of this.wgs84TileLayer.level0Nodes) {
         n.traverse((node) => {
             // only take of selectable nodes
-            if (node.setSelected) {
-                node.setSelected(node.id === selectedId);
+            if (node.material.setSelected) {
+                node.material.setSelected(node.id === selectedId);
 
                 if (node.id === selectedId) {
                     // eslint-disable-next-line no-console

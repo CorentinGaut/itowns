@@ -37,13 +37,4 @@ PanoramicMesh.prototype.setMaterial = function setMaterial(mat) {
     this.material = mat;
 };
 
-PanoramicMesh.prototype.setFog = function setFog() {
-    //  this.material.setFogDistance(fog);
-};
-
-PanoramicMesh.prototype.setSelected = function setSelected() {
-    //  this.material.setSelected(select);
-};
-
-
 export default PanoramicMesh;
