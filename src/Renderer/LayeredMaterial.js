@@ -321,11 +321,11 @@ LayeredMaterial.prototype.removeColorLayer = function removeColorLayer(layer) {
 
 LayeredMaterial.prototype.setTexturesLayer = function setTexturesLayer(textures, layerType, layer) {
     const index = this.indexOfColorLayer(layer);
-    const slotOffset = this.getTextureOffsetByLayerIndex(index);
+    const textureOffset = this.paramLayers[index].textureOffset;
     for (let i = 0, max = textures.length; i < max; i++) {
         if (textures[i]) {
             if (textures[i].texture !== null) {
-                this.setTexture(textures[i].texture, layerType, i + (slotOffset || 0), textures[i].pitch);
+                this.setTexture(textures[i].texture, layerType, i + textureOffset, textures[i].pitch);
             } else {
                 this.paramLayers[index].visible = false;
                 break;
@@ -383,13 +383,9 @@ LayeredMaterial.prototype.getColorLayersCount = function getColorLayersCount() {
     return this.uniforms.colorLayersCount.value;
 };
 
-LayeredMaterial.prototype.getTextureOffsetByLayerIndex = function getTextureOffsetByLayerIndex(index) {
-    return this.paramLayers[index].textureOffset;
-};
-
 LayeredMaterial.prototype.getLayerTextureOffset = function getLayerTextureOffset(layerId) {
     const index = this.indexOfColorLayer(layerId);
-    return index > -1 ? this.getTextureOffsetByLayerIndex(index) : -1;
+    return index > -1 ? this.paramLayers[index].textureOffset : -1;
 };
 
 LayeredMaterial.prototype.isColorLayerDownscaled = function isColorLayerDownscaled(layerId, zoom) {
@@ -402,8 +398,8 @@ LayeredMaterial.prototype.getColorLayerLevelById = function getColorLayerLevelBy
     if (index === -1) {
         return EMPTY_TEXTURE_ZOOM;
     }
-    const slot = this.getTextureOffsetByLayerIndex(index);
-    const texture = this.textures[l_COLOR][slot];
+    const textureOffset = this.paramLayers[index].textureOffset;
+    const texture = this.textures[l_COLOR][textureOffset];
 
     return texture ? texture.coords.zoom : EMPTY_TEXTURE_ZOOM;
 };
