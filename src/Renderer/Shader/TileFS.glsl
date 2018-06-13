@@ -1,3 +1,5 @@
+#include <precision_qualifier>
+#include <pitUV>
 #include <logdepthbuf_pars_fragment>
 
 // BUG CHROME 50 UBUNTU 16.04
@@ -58,6 +60,15 @@ vec4 applyLightColorToInvisibleEffect(vec4 color, float intensity) {
 #include <packing>
 uniform int  uuid;
 #endif
+
+vec4 textureOffsetScale(sampler2D texture[TEX_UNITS],vec4 offsetScale[TEX_UNITS], vec2 uv, int id){
+    #pragma unroll_loop
+    for ( int i = 0; i < TEX_UNITS; i ++ ) {
+        if ( id == i ) return texture2D(texture[ i ], pitUV(uv, offsetScale[ i ]));
+    }
+    return vec4(0.);
+}
+
 
 void main() {
     #include <logdepthbuf_fragment>
@@ -129,11 +140,11 @@ void main() {
                         // get value in array, the index must be constant
                         // Strangely it's work with function returning a global variable, doesn't work on Chrome Windows
                         // vec4 layerColor = texture2D(dTextures_01[getTextureIndex()],  pitUV(projWGS84 ? vUv_WGS84 : uvPM,pitScale_L01[getTextureIndex()]));
-                        vec4 layerColor = colorAtIdUv(
+                        vec4 layerColor = textureOffsetScale(
                             dTextures_01,
                             offsetScale_L01,
-                            textureIndex,
-                            projWGS84 ? vUv_WGS84 : uvPM);
+                            projWGS84 ? vUv_WGS84 : uvPM,
+                            textureIndex);
 
                         if (layerColor.a > 0.0 && paramsA.w > 0.0) {
                             validTexture = true;

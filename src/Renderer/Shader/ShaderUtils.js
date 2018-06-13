@@ -30,4 +30,20 @@ export default {
             USE_LOGDEPTHBUF_EXT: 1,
         };
     },
+
+    // adapted from unrollLoops in WebGLProgram
+    unrollLoops(string, defines) {
+        // look for a for loop with an unroll_loop pragma
+        // The detection of the scope of the for loop is hacky as it does not support nested scopes
+        var pattern = /#pragma unroll_loop\s+for\s*\(\s*int\s+i\s*=\s*(\d+);\s*i\s+<\s+([\w\d]+);\s*i\s*\+\+\s*\)\s*\{([^}]*)\}/g;
+        function replace(match, start, end, snippet) {
+            var unroll = '';
+            end = end in defines ? defines[end] : end;
+            for (var i = parseInt(start, 10); i < parseInt(end, 10); i++) {
+                unroll += snippet.replace(/\s+i\s+/g, ` ${i} `);
+            }
+            return unroll;
+        }
+        return string.replace(pattern, replace);
+    },
 };

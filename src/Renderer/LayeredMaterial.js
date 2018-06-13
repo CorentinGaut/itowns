@@ -8,17 +8,26 @@
 import * as THREE from 'three';
 import TileVS from './Shader/TileVS.glsl';
 import TileFS from './Shader/TileFS.glsl';
-import pitUV from './Shader/Chunk/pitUV.glsl';
-import PrecisionQualifier from './Shader/Chunk/PrecisionQualifier.glsl';
+import ShaderUtils from './Shader/ShaderUtils';
 import Capabilities from '../Core/System/Capabilities';
 import { l_COLOR, l_ELEVATION, EMPTY_TEXTURE_ZOOM } from './LayeredMaterialConstants';
+import precision_qualifier from './Shader/Chunk/PrecisionQualifier.glsl';
+import project_pars_vertex from './Shader/Chunk/project_pars_vertex.glsl';
+import elevation_pars_vertex from './Shader/Chunk/elevation_pars_vertex.glsl';
+import elevation_vertex from './Shader/Chunk/elevation_vertex.glsl';
+import pitUV from './Shader/Chunk/pitUV.glsl';
+
+THREE.ShaderChunk.precision_qualifier = precision_qualifier;
+THREE.ShaderChunk.project_pars_vertex = project_pars_vertex;
+THREE.ShaderChunk.elevation_pars_vertex = elevation_pars_vertex;
+THREE.ShaderChunk.elevation_vertex = elevation_vertex;
+THREE.ShaderChunk.pitUV = pitUV;
 
 var emptyTexture = new THREE.Texture();
 emptyTexture.coords = { zoom: EMPTY_TEXTURE_ZOOM };
 
 const layerTypesCount = 2;
 var vector4 = new THREE.Vector4(0.0, 0.0, 0.0, 0.0);
-var fooTexture;
 
 // from three.js packDepthToRGBA
 const UnpackDownscale = 255 / 256; // 0..1 -> fraction (excluding 1)
@@ -30,22 +39,6 @@ export function unpack1K(color, factor) {
         UnpackDownscale);
     return factor ? bitSh.dot(color) * factor : bitSh.dot(color);
 }
-
-var getColorAtIdUv = function getColorAtIdUv(nbTex) {
-    if (!fooTexture) {
-        fooTexture = 'vec4 colorAtIdUv(sampler2D dTextures[TEX_UNITS],vec4 offsetScale[TEX_UNITS],int id, vec2 uv){\n';
-        fooTexture += ' if (id == 0) return texture2D(dTextures[0],  pitUV(uv,offsetScale[0]));\n';
-
-        for (var l = 1; l < nbTex; l++) {
-            var sL = l.toString();
-            fooTexture += `    else if (id == ${sL}) return texture2D(dTextures[${sL}],  pitUV(uv,offsetScale[${sL}]));\n`;
-        }
-
-        fooTexture += 'else return vec4(0.0,0.0,0.0,0.0);}\n';
-    }
-
-    return fooTexture;
-};
 
 // Array not suported in IE
 var fillArray = function fillArray(array, remp) {
@@ -74,38 +67,31 @@ var moveElementsArraySafe = function moveElementsArraySafe(array,index, howMany,
 };
 /* eslint-enable */
 
-const LayeredMaterial = function LayeredMaterial(options) {
+const LayeredMaterial = function LayeredMaterial(options = {}) {
     THREE.RawShaderMaterial.call(this);
+    this.defines = {};
 
     const maxTexturesUnits = Capabilities.getMaxTextureUnitsCount();
     const nbSamplers = Math.min(maxTexturesUnits - 1, 16 - 1);
-    this.vertexShader = TileVS;
 
-    this.fragmentShaderHeader = `${PrecisionQualifier}\nconst int   TEX_UNITS   = ${nbSamplers.toString()};\n`;
-    this.fragmentShaderHeader += pitUV;
+    this.defines.TEX_UNITS = nbSamplers;
 
     if (__DEBUG__) {
-        this.fragmentShaderHeader += '#define DEBUG\n';
+        this.defines.DEBUG = 1;
     }
 
-    options = options || { };
-    let vsOptions = '';
     if (options.useRgbaTextureElevation) {
         throw new Error('Restore this feature');
     } else if (options.useColorTextureElevation) {
-        vsOptions = '\n#define COLOR_TEXTURE_ELEVATION\n';
-        vsOptions += `\nconst float _minElevation = ${options.colorTextureElevationMinZ.toFixed(1)};\n`;
-        vsOptions += `\nconst float _maxElevation = ${options.colorTextureElevationMaxZ.toFixed(1)};\n`;
+        this.defines.COLOR_TEXTURE_ELEVATION = 1;
+        this.defines._minElevation = options.colorTextureElevationMinZ.toFixed(1);
+        this.defines._maxElevation = options.colorTextureElevationMaxZ.toFixed(1);
     } else {
-        // default
-        vsOptions = '\n#define DATA_TEXTURE_ELEVATION\n';
+        this.defines.DATA_TEXTURE_ELEVATION = 1;
     }
 
-    // see GLOBE FS
-    this.fragmentShaderHeader += getColorAtIdUv(nbSamplers);
-
-    this.fragmentShader = this.fragmentShaderHeader + TileFS;
-    this.vertexShader = PrecisionQualifier + vsOptions + TileVS;
+    this.vertexShader = TileVS;
+    this.fragmentShader = ShaderUtils.unrollLoops(TileFS, this.defines);
 
     // handle on textures uniforms
     this.textures = [];
@@ -173,12 +159,8 @@ const LayeredMaterial = function LayeredMaterial(options) {
     this.elevationLayersId = [];
 
     if (Capabilities.isLogDepthBufferSupported()) {
-        this.defines = {
-            USE_LOGDEPTHBUF: 1,
-            USE_LOGDEPTHBUF_EXT: 1,
-        };
-    } else {
-        this.defines = {};
+        this.defines.USE_LOGDEPTHBUF = 1;
+        this.defines.USE_LOGDEPTHBUF_EXT = 1;
     }
 
     if (__DEBUG__) {

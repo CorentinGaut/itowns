@@ -1,5 +1,4 @@
-precision highp float;
-
+#include <precision_qualifier>
 #include <project_pars_vertex>
 #include <projective_texturing_pars_vertex>
 #include <logdepthbuf_pars_vertex>

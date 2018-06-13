@@ -1,33 +1,19 @@
 import * as THREE from 'three';
 import textureVS from './Shader/ProjectiveTextureVS.glsl';
 import textureFS from './Shader/ProjectiveTextureFS.glsl';
+import ShaderUtils from './Shader/ShaderUtils';
+import precision_qualifier from './Shader/Chunk/PrecisionQualifier.glsl';
 import project_pars_vertex from './Shader/Chunk/project_pars_vertex.glsl';
 import projective_texturing_vertex from './Shader/Chunk/projective_texturing_vertex.glsl';
 import projective_texturing_pars_vertex from './Shader/Chunk/projective_texturing_pars_vertex.glsl';
 import projective_texturing_pars_fragment from './Shader/Chunk/projective_texturing_pars_fragment.glsl';
 import Capabilities from '../Core/System/Capabilities';
 
+THREE.ShaderChunk.precision_qualifier = precision_qualifier;
+THREE.ShaderChunk.project_pars_vertex = project_pars_vertex;
 THREE.ShaderChunk.projective_texturing_vertex = projective_texturing_vertex;
 THREE.ShaderChunk.projective_texturing_pars_vertex = projective_texturing_pars_vertex;
 THREE.ShaderChunk.projective_texturing_pars_fragment = projective_texturing_pars_fragment;
-THREE.ShaderChunk.project_pars_vertex = project_pars_vertex;
-
-
-// adapted from unrollLoops in WebGLProgram
-function unrollLoops(string, defines) {
-    // look for a for loop with an unroll_loop pragma
-    // The detection of the scope of the for loop is hacky as it does not support nested scopes
-    var pattern = /#pragma unroll_loop\s+for\s*\(\s*int\s+i\s*=\s*(\d+);\s*i\s+<\s+([\w\d]+);\s*i\s*\+\+\s*\)\s*\{([^}]*)\}/g;
-    function replace(match, start, end, snippet) {
-        var unroll = '';
-        end = end in defines ? defines[end] : end;
-        for (var i = parseInt(start, 10); i < parseInt(end, 10); i++) {
-            unroll += snippet.replace(/\[\s*i\s*\]/g, `[ ${i} ]`);
-        }
-        return unroll;
-    }
-    return string.replace(pattern, replace);
-}
 
 var ndcToTextureMatrix = new THREE.Matrix4().set(
     1, 0, 0, 1,
@@ -78,7 +64,7 @@ class OrientedImageMaterial extends THREE.RawShaderMaterial {
             this.defines.USE_LOGDEPTHBUF_EXT = 1;
         }
         this.vertexShader = textureVS;
-        this.fragmentShader = unrollLoops(textureFS, this.defines);
+        this.fragmentShader = ShaderUtils.unrollLoops(textureFS, this.defines);
     }
 
     setTextures(textures, feature) {

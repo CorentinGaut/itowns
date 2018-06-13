@@ -11,7 +11,7 @@ void main(void)
 
     #pragma unroll_loop
     for ( int i = 0; i < NUM_TEXTURES; i ++ ) {
-        color += projectiveTextureColor(projectiveTextureCoords[i], projectiveTextureDistortion[i], projectiveTexture[i]);
+        color += projectiveTextureColor(projectiveTextureCoords[ i ], projectiveTextureDistortion[ i ], projectiveTexture[ i ]);
     }
 
     if (color.a > 0.0) color /= color.a;

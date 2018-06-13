@@ -1,12 +1,8 @@
-precision highp float;
-precision highp int;
-
+#include <precision_qualifier>
+#include <project_pars_vertex>
 #include <logdepthbuf_pars_vertex>
 #define EPSILON 1e-6
 
-attribute vec3 position;
-uniform mat4 projectionMatrix;
-uniform mat4 modelViewMatrix;
 uniform float size;
 
 uniform bool pickingMode;
@@ -18,13 +14,15 @@ attribute vec4 unique_id;
 varying vec4 vColor;
 
 void main() {
+    
     if (pickingMode) {
         vColor = unique_id;
     } else {
         vColor = vec4(mix(color, overlayColor.rgb, overlayColor.a), opacity);
     }
 
-    gl_Position = projectionMatrix * (modelViewMatrix * vec4( position, 1.0 ));
+    #include <begin_vertex>
+    #include <project_vertex>
 
     if (size > 0.) {
         gl_PointSize = size;
