@@ -209,9 +209,13 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
     // TODO: move this to defineLayerProperty() declaration
     // to avoid mixing layer's network updates and layer's params
     // Update material parameters
-    const layerIndex = material.indexOfColorLayer(layer.id);
-    material.setLayerVisibility(layerIndex, layer.visible);
-    material.setLayerOpacity(layerIndex, layer.opacity);
+    if (material.getColorLayer) {
+        const materialLayer = material.getColorLayer(layer.id);
+        if (materialLayer) {
+            materialLayer.visible = layer.visible;
+            materialLayer.opacity = layer.opacity;
+        }
+    }
 
     const ts = Date.now();
     // An update is pending / or impossible -> abort
