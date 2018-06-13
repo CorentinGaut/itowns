@@ -79,6 +79,8 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
 
     if (__DEBUG__) {
         this.defines.DEBUG = 1;
+        this.showOutline = false;
+        this.uniforms.showOutline = new THREE.Uniform(this.showOutline);
     }
 
     if (options.useRgbaTextureElevation) {
@@ -93,6 +95,10 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
 
     this.vertexShader = TileVS;
     this.fragmentShader = ShaderUtils.unrollLoops(TileFS, this.defines);
+
+    this.lightPosition = new THREE.Vector3();
+    this.noTextureColor = new THREE.Color();
+
 
     // handle on textures uniforms
     this.textures = [];
@@ -109,12 +115,20 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
 
     this.textures[l_ELEVATION] = [emptyTexture];
     this.textures[l_COLOR] = Array(nbSamplers);
-    var paramLayers = Array(8);
+    this.paramLayers = Array(8);
     this.layerTexturesCount = Array(8);
 
     fillArray(this.textures[l_COLOR], emptyTexture);
-    fillArray(paramLayers, vector4);
+    fillArray(this.paramLayers, {});
     fillArray(this.layerTexturesCount, 0);
+
+
+    this.noTextureColor = new THREE.Color(0.04, 0.23, 0.35);
+    this.lightPosition = new THREE.Vector3(-0.5, 0.0, 1.0);
+    this.distanceFog = 1000000000.0;
+    this.selected = false;
+    this.lightingEnabled = false;
+    this.uuid = 0;
 
     // Elevation texture
     this.uniforms.dTextures_00 = new THREE.Uniform(this.textures[l_ELEVATION]);
@@ -122,18 +136,14 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
     // Color textures's layer
     this.uniforms.dTextures_01 = new THREE.Uniform(this.textures[l_COLOR]);
 
-    // Visibility layer
-    this.uniforms.visibility = new THREE.Uniform([true, true, true, true, true, true, true, true]);
-
     // Loaded textures count by layer's type
-    this.uniforms.loadedTexturesCount = new THREE.Uniform(this.loadedTexturesCount);
+    this.uniforms.elevationTextureCount = new THREE.Uniform(0);
+    this.uniforms.colorTextureCount = new THREE.Uniform(0);
 
     // Count color layers
     this.uniforms.colorLayersCount = new THREE.Uniform(1);
 
-    // Layer setting
-    // Offset color texture slot | Projection | fx | Opacity
-    this.uniforms.paramLayers = new THREE.Uniform(paramLayers);
+    this.uniforms.paramLayers = new THREE.Uniform(this.paramLayers);
 
     // Elevation texture cropping
     this.uniforms.offsetScale_L00 = new THREE.Uniform(this.offsetScale[l_ELEVATION]);
@@ -141,20 +151,13 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
     // Color texture cropping
     this.uniforms.offsetScale_L01 = new THREE.Uniform(this.offsetScale[l_COLOR]);
 
-    // Light position
-    this.uniforms.lightPosition = new THREE.Uniform(new THREE.Vector3(-0.5, 0.0, 1.0));
-
-    this.uniforms.distanceFog = new THREE.Uniform(1000000000.0);
-
-    this.uniforms.uuid = new THREE.Uniform(0);
-
-    this.uniforms.selected = new THREE.Uniform(false);
-
-    this.uniforms.lightingEnabled = new THREE.Uniform(false);
-
-    this.uniforms.noTextureColor = new THREE.Uniform(new THREE.Color(0.04, 0.23, 0.35));
-
-    this.uniforms.opacity = new THREE.Uniform(1.0);
+    this.uniforms.lightPosition = new THREE.Uniform(this.lightPosition);
+    this.uniforms.distanceFog = new THREE.Uniform(this.distanceFog);
+    this.uniforms.uuid = new THREE.Uniform(this.uuid);
+    this.uniforms.selected = new THREE.Uniform(this.selected);
+    this.uniforms.lightingEnabled = new THREE.Uniform(this.lightingEnabled);
+    this.uniforms.noTextureColor = new THREE.Uniform(this.noTextureColor);
+    this.uniforms.opacity = new THREE.Uniform(this.opacity);
 
     this.colorLayersId = [];
     this.elevationLayersId = [];
@@ -200,8 +203,24 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
     }
 };
 
+
 LayeredMaterial.prototype = Object.create(THREE.RawShaderMaterial.prototype);
 LayeredMaterial.prototype.constructor = LayeredMaterial;
+
+LayeredMaterial.prototype.updateUniforms = function updateUniforms() {
+    this.uniforms.opacity.value = this.opacity;
+    this.uniforms.showOutline.value = this.showOutline;
+    this.uniforms.lightingEnabled.value = this.lightingEnabled;
+    this.uniforms.selected.value = this.selected;
+    this.uniforms.uuid.value = this.uuid;
+    this.uniforms.distanceFog.value = this.distanceFog;
+    this.uniforms.noTextureColor.value.copy(this.noTextureColor);
+    this.uniforms.lightPosition.value.copy(this.lightPosition);
+    this.uniforms.elevationTextureCount.value = this.textures[l_ELEVATION][0] === emptyTexture ? 0 : 1;
+    // this.uniforms.colorTextureCount.value = ???;
+    this.uniforms.colorLayersCount.value = this.colorLayersId.length;
+    this.uniformsNeedUpdate = true;
+};
 
 LayeredMaterial.prototype.dispose = function dispose() {
     // TODO: WARNING  verify if textures to dispose aren't attached with ancestor
@@ -238,7 +257,6 @@ LayeredMaterial.prototype.setSequence = function setSequence(sequenceLayer) {
                 moveElementArray(this.colorLayersId, oldIndex, newIndex);
                 moveElementArray(this.layerTexturesCount, oldIndex, newIndex);
                 moveElementArray(this.uniforms.paramLayers.value, oldIndex, newIndex);
-                moveElementArray(this.uniforms.visibility.value, oldIndex, newIndex);
             }
             const oldOffset = this.getTextureOffsetByLayerIndex(newIndex);
             // consecutive values are copied from original
@@ -254,8 +272,6 @@ LayeredMaterial.prototype.setSequence = function setSequence(sequenceLayer) {
             offsetLayer++;
         }
     }
-
-    this.uniforms.colorLayersCount.value = this.getColorLayersCount();
 };
 
 LayeredMaterial.prototype.removeColorLayer = function removeColorLayer(layer) {
@@ -277,12 +293,10 @@ LayeredMaterial.prototype.removeColorLayer = function removeColorLayer(layer) {
     this.layerTexturesCount.push(0);
 
     // Remove Layers Parameters
-    this.uniforms.paramLayers.value.splice(layerIndex, 1);
-    this.uniforms.paramLayers.value.push(vector4);
+    var param = this.uniforms.paramLayers.value.splice(layerIndex, 1)[0];
+    param.visible = true;
+    this.uniforms.paramLayers.value.push(param);
 
-    // Remove visibility Parameters
-    this.uniforms.visibility.value.splice(layerIndex, 1);
-    this.uniforms.visibility.value.push(true);
 
     // Dispose Layers textures
     for (let i = offset, max = offset + texturesCount; i < max; i++) {
@@ -304,7 +318,7 @@ LayeredMaterial.prototype.removeColorLayer = function removeColorLayer(layer) {
 
     // Update slot start texture layer
     for (let j = layerIndex, mx = this.getColorLayersCount(); j < mx; j++) {
-        this.uniforms.paramLayers.value[j].x -= texturesCount;
+        this.uniforms.paramLayers.value[j].textureOffset -= texturesCount;
     }
 
     this.loadedTexturesCount[l_COLOR] -= loadedTexturesLayerCount;
@@ -350,7 +364,7 @@ LayeredMaterial.prototype.pushLayer = function pushLayer(param) {
     const newIndex = this.getColorLayersCount();
     const offset = newIndex === 0 ? 0 : this.getTextureOffsetByLayerIndex(newIndex - 1) + this.getTextureCountByLayerIndex(newIndex - 1);
 
-    this.uniforms.paramLayers.value[newIndex] = new THREE.Vector4();
+    this.uniforms.paramLayers.value[newIndex] = {};
 
     this.setTextureOffsetByLayerIndex(newIndex, offset);
     // If there's only one texture: assume it covers the whole tile,
@@ -374,7 +388,7 @@ LayeredMaterial.prototype.getColorLayersCount = function getColorLayersCount() {
 };
 
 LayeredMaterial.prototype.getTextureOffsetByLayerIndex = function getTextureOffsetByLayerIndex(index) {
-    return this.uniforms.paramLayers.value[index].x;
+    return this.uniforms.paramLayers.value[index].textureOffset;
 };
 
 LayeredMaterial.prototype.getTextureCountByLayerIndex = function getTextureCountByLayerIndex(index) {
@@ -386,33 +400,28 @@ LayeredMaterial.prototype.getLayerTextureOffset = function getLayerTextureOffset
     return index > -1 ? this.getTextureOffsetByLayerIndex(index) : -1;
 };
 
-LayeredMaterial.prototype.setLightingOn = function setLightingOn(enable) {
-    this.uniforms.lightingEnabled.value = enable;
+LayeredMaterial.prototype.setLayerFx = function setLayerFx(index, effect) {
+    this.uniforms.paramLayers.value[index].effect = effect;
 };
 
-LayeredMaterial.prototype.setLayerFx = function setLayerFx(index, fx) {
-    this.uniforms.paramLayers.value[index].z = fx;
+LayeredMaterial.prototype.setTextureOffsetByLayerIndex = function setTextureOffsetByLayerIndex(index, textureOffset) {
+    this.uniforms.paramLayers.value[index].textureOffset = textureOffset;
 };
 
-LayeredMaterial.prototype.setTextureOffsetByLayerIndex = function setTextureOffsetByLayerIndex(index, offset) {
-    this.uniforms.paramLayers.value[index].x = offset;
-};
-
-LayeredMaterial.prototype.setLayerUV = function setLayerUV(index, idUV) {
-    this.uniforms.paramLayers.value[index].y = idUV;
+LayeredMaterial.prototype.setLayerUV = function setLayerUV(index, textureCount) {
+    this.uniforms.paramLayers.value[index].textureCount = textureCount;
 };
 
 LayeredMaterial.prototype.getLayerUV = function setLayerUV(index) {
-    return this.uniforms.paramLayers.value[index].y;
+    return this.uniforms.paramLayers.value[index].textureCount;
 };
 
 LayeredMaterial.prototype.setLayerOpacity = function setLayerOpacity(index, opacity) {
-    if (this.uniforms.paramLayers.value[index])
-        { this.uniforms.paramLayers.value[index].w = opacity; }
+    if (this.uniforms.paramLayers.value[index]) this.uniforms.paramLayers.value[index].opacity = opacity;
 };
 
 LayeredMaterial.prototype.setLayerVisibility = function setLayerVisibility(index, visible) {
-    this.uniforms.visibility.value[index] = visible;
+    if (this.uniforms.paramLayers.value[index]) this.uniforms.paramLayers.value[index].visible = visible;
 };
 
 LayeredMaterial.prototype.setLayerTexturesCount = function setLayerTexturesCount(index, count) {
@@ -458,18 +467,5 @@ LayeredMaterial.prototype.getLayerTextures = function getLayerTextures(layerType
         throw new Error(`Invalid layer id "${layerId}"`);
     }
 };
-
-LayeredMaterial.prototype.setUuid = function setUuid(uuid) {
-    this.uniforms.uuid.value = uuid;
-};
-
-LayeredMaterial.prototype.setFogDistance = function setFogDistance(df) {
-    this.uniforms.distanceFog.value = df;
-};
-
-LayeredMaterial.prototype.setSelected = function setSelected(selected) {
-    this.uniforms.selected.value = selected;
-};
-
 
 export default LayeredMaterial;

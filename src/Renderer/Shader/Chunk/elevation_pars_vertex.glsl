@@ -1,7 +1,7 @@
 
 uniform sampler2D   dTextures_00[1];
 uniform vec3        offsetScale_L00[1];
-uniform int         loadedTexturesCount[8];
+uniform int         elevationTextureCount;
 
 #define displacementMap         (dTextures_00[0])
 #define displacementOffsetScale (offsetScale_L00[0])

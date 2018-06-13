@@ -1,4 +1,4 @@
-    if(loadedTexturesCount[0] > 0) {
+    if(elevationTextureCount > 0) {
         uv = uv * displacementOffsetScale.z + displacementOffsetScale.xy;
 
         #if defined(RGBA_TEXTURE_ELEVATION)

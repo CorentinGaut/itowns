@@ -43,7 +43,8 @@ function TileMesh(geometry, params) {
 
     this.layerUpdateState = {};
 
-    this.material.setUuid(this.id);
+    this.material.uuid = this.id;
+    this.material.updateUniforms();
 
     this._state = RendererConstant.FINAL;
 }
@@ -110,14 +111,6 @@ TileMesh.prototype.pushRenderState = function pushRenderState(state) {
     return () => {
         this.traverse(n => applyChangeState(n, oldState));
     };
-};
-
-TileMesh.prototype.setFog = function setFog(fog) {
-    this.material.setFogDistance(fog);
-};
-
-TileMesh.prototype.setSelected = function setSelected(select) {
-    this.material.setSelected(select);
 };
 
 TileMesh.prototype.setTextureElevation = function setTextureElevation(elevation) {

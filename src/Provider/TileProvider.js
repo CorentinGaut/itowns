@@ -98,7 +98,7 @@ function executeCommand(command) {
     tile.quaternion.copy(quaternion);
 
     tile.material.transparent = layer.opacity < 1.0;
-    tile.material.uniforms.opacity.value = layer.opacity;
+    tile.material.opacity = layer.opacity;
     tile.setVisibility(false);
     tile.updateMatrix();
 
