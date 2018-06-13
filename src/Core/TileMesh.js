@@ -162,7 +162,7 @@ TileMesh.prototype.isColorLayerLoaded = function isColorLayerLoaded(layerId) {
 };
 
 TileMesh.prototype.isElevationLayerLoaded = function isElevationLayerLoaded() {
-    return this.material.loadedTexturesCount[l_ELEVATION] > 0;
+    return this.material.textures[l_ELEVATION].length > 0;
 };
 
 TileMesh.prototype.isColorLayerDownscaled = function isColorLayerDownscaled(layer) {

@@ -105,8 +105,6 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
     this.textures = [];
     // handle on textures offsetScale uniforms
     this.offsetScale = [];
-    // handle Loaded textures count by layer's type uniforms
-    this.loadedTexturesCount = [0, 0];
 
     // Uniform three js needs no empty array
     // WARNING TODO: prevent empty slot, but it's not the solution
@@ -114,7 +112,7 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
     this.offsetScale[l_ELEVATION] = [vector4];
     fillArray(this.offsetScale[l_COLOR], vector4);
 
-    this.textures[l_ELEVATION] = [emptyTexture];
+    this.textures[l_ELEVATION] = [null];
     this.textures[l_COLOR] = Array(nbSamplers);
     this.paramLayers = Array(nbLayers);
 
@@ -137,7 +135,6 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
 
     // Loaded textures count by layer's type
     this.uniforms.elevationTextureCount = new THREE.Uniform(0);
-    this.uniforms.colorTextureCount = new THREE.Uniform(0);
 
     // Count color layers
     this.uniforms.colorLayersCount = new THREE.Uniform(0);
@@ -214,8 +211,7 @@ LayeredMaterial.prototype.updateUniforms = function updateUniforms() {
     this.uniforms.distanceFog.value = this.distanceFog;
     this.uniforms.noTextureColor.value.copy(this.noTextureColor);
     this.uniforms.lightPosition.value.copy(this.lightPosition);
-    this.uniforms.elevationTextureCount.value = this.textures[l_ELEVATION][0] === emptyTexture ? 0 : 1;
-    // this.uniforms.colorTextureCount.value = ???;
+    this.uniforms.elevationTextureCount.value = this.textures[l_ELEVATION][0] ? 0 : 1;
     this.uniformsNeedUpdate = true;
 };
 
@@ -297,10 +293,7 @@ LayeredMaterial.prototype.removeColorLayer = function removeColorLayer(layer) {
         }
     }
 
-    const removedTexturesLayer = this.textures[l_COLOR].splice(offset, texturesCount);
     this.offsetScale[l_COLOR].splice(offset, texturesCount);
-
-    const loadedTexturesLayerCount = removedTexturesLayer.reduce((sum, texture) => sum + (texture.coords.zoom > EMPTY_TEXTURE_ZOOM), 0);
 
     // refill remove textures
     for (let i = 0, max = texturesCount; i < max; i++) {
@@ -312,8 +305,6 @@ LayeredMaterial.prototype.removeColorLayer = function removeColorLayer(layer) {
     for (let j = layerIndex, mx = this.getColorLayersCount(); j < mx; j++) {
         this.paramLayers[j].textureOffset -= texturesCount;
     }
-
-    this.loadedTexturesCount[l_COLOR] -= loadedTexturesLayerCount;
 
     this.uniforms.offsetScale_L01.value = this.offsetScale[l_COLOR];
     this.uniforms.dTextures_01.value = this.textures[l_COLOR];
@@ -335,21 +326,9 @@ LayeredMaterial.prototype.setTexturesLayer = function setTexturesLayer(textures,
 };
 
 LayeredMaterial.prototype.setTexture = function setTexture(texture, layerType, slot, offsetScale) {
-    if (this.textures[layerType][slot] === undefined || this.textures[layerType][slot].image === undefined) {
-        this.loadedTexturesCount[layerType] += 1;
-    }
-
     // BEWARE: array [] -> size: 0; array [10]="wao" -> size: 11
     this.textures[layerType][slot] = texture || emptyTexture;
     this.offsetScale[layerType][slot] = offsetScale || new THREE.Vector4(0.0, 0.0, 1.0, 1.0);
-};
-
-LayeredMaterial.prototype.setColorLayerParameters = function setColorLayerParameters(params) {
-    if (this.getColorLayersCount() === 0) {
-        for (let l = 0; l < params.length; l++) {
-            this.pushLayer(params[l]);
-        }
-    }
 };
 
 LayeredMaterial.prototype.pushLayer = function pushLayer(param) {
@@ -405,7 +384,7 @@ LayeredMaterial.prototype.getColorLayerLevelById = function getColorLayerLevelBy
 };
 
 LayeredMaterial.prototype.getElevationLayerLevel = function getElevationLayerLevel() {
-    return this.textures[l_ELEVATION][0].coords.zoom;
+    return this.textures[l_ELEVATION][0] ? this.textures[l_ELEVATION][0].coords.zoom : EMPTY_TEXTURE_ZOOM;
 };
 
 LayeredMaterial.prototype.getLayerTextures = function getLayerTextures(layerType, layerId) {
