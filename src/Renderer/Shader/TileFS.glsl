@@ -61,12 +61,22 @@ vec4 applyLightColorToInvisibleEffect(vec4 color, float intensity) {
 uniform int  uuid;
 #endif
 
-vec4 textureOffsetScale(sampler2D texture[TEX_UNITS],vec4 offsetScale[TEX_UNITS], vec2 uv, int id){
-    #pragma unroll_loop
-    for ( int i = 0; i < TEX_UNITS; i ++ ) {
-        if ( id == i ) return texture2D(texture[ i ], pitUV(uv, offsetScale[ i ]));
+vec4 textureOffsetScale(sampler2D texture, vec4 offsetScale[TEX_UNITS], vec4 params[TEX_UNITS], int layer, vec2 uv){
+    if (layer == -1) return vec4(0.);
+    vec4 paramsA = params[layer];
+    vec4 color = texture2D(texture, pitUV(uv, offsetScale[layer]));
+    if (color.a > 0.0 && paramsA.w > 0.0) {
+        if(paramsA.z > 2.0) {
+            color.rgb /= color.a;
+            color = applyLightColorToInvisibleEffect(color, paramsA.z);
+            color.rgb *= color.a;
+        } else if(paramsA.z > 0.0) {
+            color.rgb /= color.a;
+            color = applyWhiteToInvisibleEffect(color, paramsA.z);
+            color.rgb *= color.a;
+        }
     }
-    return vec4(0.);
+    return color * paramsA.w;
 }
 
 
@@ -97,6 +107,7 @@ void main() {
         float y            = vUv_PM;
         int pmSubTextureIndex = int(floor(y));
         uvPM.y             = y - float(pmSubTextureIndex);
+        vec2 uv = projWGS84 ? vUv_WGS84 : uvPM;
 
         #if defined(USE_LOGDEPTHBUF) && defined(USE_LOGDEPTHBUF_EXT)
             float depth = gl_FragDepthEXT / gl_FragCoord.w;
@@ -107,7 +118,11 @@ void main() {
         float fogIntensity = 1.0/(exp(depth/distanceFog));
 
         vec4 diffuseColor = vec4(noTextureColor, 1.0);
-        bool validTexture = false;
+        
+        int layerById[TEX_UNITS];
+        for (int i = 0; i < TEX_UNITS; i++) {
+            layerById[i] = -1;
+        }
 
         // TODO Optimisation des uv1 peuvent copier pas lignes!!
         for (int layer = 0; layer < 8; layer++) {
@@ -134,45 +149,28 @@ void main() {
                     }
                     #endif
 
-                    /* if (0 <= textureIndex && textureIndex < loadedTexturesCount[1]) */ {
-
-                        // TODO: Try other OS before delete dead
-                        // get value in array, the index must be constant
-                        // Strangely it's work with function returning a global variable, doesn't work on Chrome Windows
-                        // vec4 layerColor = texture2D(dTextures_01[getTextureIndex()],  pitUV(projWGS84 ? vUv_WGS84 : uvPM,pitScale_L01[getTextureIndex()]));
-                        vec4 layerColor = textureOffsetScale(
-                            dTextures_01,
-                            offsetScale_L01,
-                            projWGS84 ? vUv_WGS84 : uvPM,
-                            textureIndex);
-
-                        if (layerColor.a > 0.0 && paramsA.w > 0.0) {
-                            validTexture = true;
-                            if(paramsA.z > 2.0) {
-                                layerColor.rgb /= layerColor.a;
-                                layerColor = applyLightColorToInvisibleEffect(layerColor, paramsA.z);
-                                layerColor.rgb *= layerColor.a;
-                            } else if(paramsA.z > 0.0) {
-                                layerColor.rgb /= layerColor.a;
-                                layerColor = applyWhiteToInvisibleEffect(layerColor, paramsA.z);
-                                layerColor.rgb *= layerColor.a;
-                            }
-
-                            // Use premultiplied-alpha blending formula because source textures are either:
-                            //     - fully opaque (layer.transparent = false)
-                            //     - or use premultiplied alpha (texture.premultiplyAlpha = true)
-                            // Note: using material.premultipliedAlpha doesn't make sense since we're manually blending
-                            // the multiple colors in the shader.
-                            diffuseColor = diffuseColor * (1.0 - layerColor.a * paramsA.w) + layerColor * paramsA.w;
-                        }
-                    }
+                    layerById[textureIndex] = layer;
                 }
             }
         }
 
-        // No texture color
-        if (!validTexture) {
-            diffuseColor.rgb = noTextureColor;
+        /* if (0 <= i && i < loadedTexturesCount[1]) */ {
+        // TODO: Try other OS before delete dead
+        // get value in array, the index must be constant
+        // Strangely it's work with function returning a global variable, doesn't work on Chrome Windows
+        // vec4 layerColor = texture2D(dTextures_01[getTextureIndex()],  pitUV(projWGS84 ? vUv_WGS84 : uvPM,pitScale_L01[getTextureIndex()]));
+
+        // Use premultiplied-alpha blending formula because source textures are either:
+        //     - fully opaque (layer.transparent = false)
+        //     - or use premultiplied alpha (texture.premultiplyAlpha = true)
+        // Note: using material.premultipliedAlpha doesn't make sense since we're manually blending
+        // the multiple colors in the shader.
+
+        vec4 layerColor;
+        #pragma unroll_loop
+        for ( int i = 0; i < TEX_UNITS; i ++ ) {
+            layerColor = textureOffsetScale(dTextures_01[ i ], offsetScale_L01, paramLayers, layerById[ i ], uv));
+            diffuseColor = layerColor + diffuseColor * (1.0 - layerColor.a);
         }
 
         // Selected

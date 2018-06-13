@@ -92,6 +92,7 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
 
     this.vertexShader = TileVS;
     this.fragmentShader = ShaderUtils.unrollLoops(TileFS, this.defines);
+    console.log(this.fragmentShader);
 
     // handle on textures uniforms
     this.textures = [];
