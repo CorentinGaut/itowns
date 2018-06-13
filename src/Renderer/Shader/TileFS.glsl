@@ -38,19 +38,6 @@ varying vec3        vNormal;
 
 uniform float opacity;
 
-vec4 applyWhiteToInvisibleEffect(vec4 color, float intensity) {
-    float a = (color.r + color.g + color.b) * 0.333333333;
-    color.a *= 1.0 - pow(abs(a), intensity);
-    return color;
-}
-
-vec4 applyLightColorToInvisibleEffect(vec4 color, float intensity) {
-    float a = max(0.05,1.0 - length(color.xyz - CWhite.xyz));
-    color.a *= 1.0 - pow(abs(a), intensity);
-    color.rgb *= color.rgb * color.rgb;
-    return color;
-}
-
 #if defined(DEBUG)
     uniform bool showOutline;
     const float sLine = 0.008;
@@ -60,6 +47,19 @@ vec4 applyLightColorToInvisibleEffect(vec4 color, float intensity) {
 #include <packing>
 uniform int  uuid;
 #endif
+
+vec4 applyWhiteToInvisibleEffect(vec4 color, float intensity) {
+    float a = dot(color.rgb, vec3(0.333333333));
+    color.a *= 1.0 - pow(abs(a), intensity);
+    return color;
+}
+
+vec4 applyLightColorToInvisibleEffect(vec4 color, float intensity) {
+    float a = max(0.05,1.0 - distance(color.xyz, CWhite.xyz));
+    color.a *= 1.0 - pow(abs(a), intensity);
+    color.rgb *= color.rgb * color.rgb;
+    return color;
+}
 
 vec4 getLayerColor(sampler2D texture,vec4 offsetScale, vec2 uv, vec4 param) {
     vec4 color = texture2D(texture, pitUV(uv, offsetScale));
@@ -115,7 +115,7 @@ void main() {
     }
     #endif
 
-    vec4 diffuseColor = vec4(noTextureColor, 1.0);
+    vec3 diffuseColor = noTextureColor;
     for (int layer = 0; layer < NUM_LAYERS; layer++) {
         if(layer == colorLayersCount) {
             break;
@@ -131,13 +131,14 @@ void main() {
             for ( int i = 0; i < NUM_TEXTURES; i ++ ) {
                 if ( textureIndex == i ) layerColor = getLayerColor(dTextures_01[ i ], offsetScale_L01[ i ], uv, param);
             }
-            diffuseColor = layerColor + diffuseColor * (1.0 - layerColor.a);
+            // layerColor is alpha-premultiplied
+            diffuseColor = layerColor.rgb + diffuseColor * (1.0 - layerColor.a);
         }
     }
 
     // Selected
     if(selected) {
-        diffuseColor = mix(COrange, diffuseColor, 0.5 );
+        diffuseColor = mix(COrange.rgb, diffuseColor, 0.5 );
     }
 
     // Fog
@@ -147,8 +148,7 @@ void main() {
         float depth = gl_FragCoord.z / gl_FragCoord.w;
     #endif
     float fogIntensity = 1.0/(exp(depth/distanceFog));
-    gl_FragColor = mix(CFog, diffuseColor, fogIntensity);
-    gl_FragColor.a = 1.0;
+    gl_FragColor.rgb = mix(CFog.rgb, diffuseColor.rgb, fogIntensity);
 
     if(lightingEnabled) {   // Add lighting
         float light = min(2. * dot(vNormal, lightPosition),1.);

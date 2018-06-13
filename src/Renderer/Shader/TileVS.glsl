@@ -14,7 +14,6 @@ varying vec2        vUv_WGS84;
 varying float       vUv_PM;
 varying vec3        vNormal;
 
-
 void main() {
         vec2 uv = vec2(uv_wgs84.x, 1.0 - uv_wgs84.y);
 
