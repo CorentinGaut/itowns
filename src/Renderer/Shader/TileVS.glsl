@@ -1,6 +1,6 @@
-#include <precision_qualifier>
-#include <project_pars_vertex>
-#include <elevation_pars_vertex>
+#include <itowns.precision_qualifier>
+#include <itowns.project_pars_vertex>
+#include <itowns.elevation_pars_vertex>
 #include <logdepthbuf_pars_vertex>
 #define EPSILON 1e-6
 
@@ -18,7 +18,7 @@ void main() {
         vec2 uv = vec2(uv_wgs84.x, 1.0 - uv_wgs84.y);
 
         #include <begin_vertex>
-        #include <elevation_vertex>
+        #include <itowns.elevation_vertex>
         #include <project_vertex>
         #include <logdepthbuf_vertex>
 

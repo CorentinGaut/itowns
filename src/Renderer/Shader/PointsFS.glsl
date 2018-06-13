@@ -1,6 +1,4 @@
-precision highp float;
-precision highp int;
-
+#include <itowns.precision_qualifier>
 #include <logdepthbuf_pars_fragment>
 
 varying vec4 vColor;

@@ -1,5 +1,5 @@
-#include <precision_qualifier>
-#include <project_pars_vertex>
+#include <itowns.precision_qualifier>
+#include <itowns.project_pars_vertex>
 #include <logdepthbuf_pars_vertex>
 #define EPSILON 1e-6
 

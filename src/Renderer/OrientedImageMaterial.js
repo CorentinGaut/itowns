@@ -9,11 +9,11 @@ import projective_texturing_pars_vertex from './Shader/Chunk/projective_texturin
 import projective_texturing_pars_fragment from './Shader/Chunk/projective_texturing_pars_fragment.glsl';
 import Capabilities from '../Core/System/Capabilities';
 
-THREE.ShaderChunk.precision_qualifier = precision_qualifier;
-THREE.ShaderChunk.project_pars_vertex = project_pars_vertex;
-THREE.ShaderChunk.projective_texturing_vertex = projective_texturing_vertex;
-THREE.ShaderChunk.projective_texturing_pars_vertex = projective_texturing_pars_vertex;
-THREE.ShaderChunk.projective_texturing_pars_fragment = projective_texturing_pars_fragment;
+THREE.ShaderChunk['itowns.precision_qualifier'] = precision_qualifier;
+THREE.ShaderChunk['itowns.project_pars_vertex'] = project_pars_vertex;
+THREE.ShaderChunk['itowns.projective_texturing_vertex'] = projective_texturing_vertex;
+THREE.ShaderChunk['itowns.projective_texturing_pars_vertex'] = projective_texturing_pars_vertex;
+THREE.ShaderChunk['itowns.projective_texturing_pars_fragment'] = projective_texturing_pars_fragment;
 
 var ndcToTextureMatrix = new THREE.Matrix4().set(
     1, 0, 0, 1,

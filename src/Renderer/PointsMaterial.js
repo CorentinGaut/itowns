@@ -5,8 +5,8 @@ import Capabilities from '../Core/System/Capabilities';
 import precision_qualifier from './Shader/Chunk/PrecisionQualifier.glsl';
 import project_pars_vertex from './Shader/Chunk/project_pars_vertex.glsl';
 
-ShaderChunk.precision_qualifier = precision_qualifier;
-ShaderChunk.project_pars_vertex = project_pars_vertex;
+ShaderChunk['itowns.precision_qualifier'] = precision_qualifier;
+ShaderChunk['itowns.project_pars_vertex'] = project_pars_vertex;
 
 class PointsMaterial extends RawShaderMaterial {
     constructor(size = 0) {

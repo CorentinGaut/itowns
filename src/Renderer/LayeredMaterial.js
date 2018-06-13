@@ -17,11 +17,11 @@ import elevation_pars_vertex from './Shader/Chunk/elevation_pars_vertex.glsl';
 import elevation_vertex from './Shader/Chunk/elevation_vertex.glsl';
 import pitUV from './Shader/Chunk/pitUV.glsl';
 
-THREE.ShaderChunk.precision_qualifier = precision_qualifier;
-THREE.ShaderChunk.project_pars_vertex = project_pars_vertex;
-THREE.ShaderChunk.elevation_pars_vertex = elevation_pars_vertex;
-THREE.ShaderChunk.elevation_vertex = elevation_vertex;
-THREE.ShaderChunk.pitUV = pitUV;
+THREE.ShaderChunk['itowns.precision_qualifier'] = precision_qualifier;
+THREE.ShaderChunk['itowns.project_pars_vertex'] = project_pars_vertex;
+THREE.ShaderChunk['itowns.elevation_pars_vertex'] = elevation_pars_vertex;
+THREE.ShaderChunk['itowns.elevation_vertex'] = elevation_vertex;
+THREE.ShaderChunk['itowns.pitUV'] = pitUV;
 
 var emptyTexture = new THREE.Texture();
 emptyTexture.coords = { zoom: EMPTY_TEXTURE_ZOOM };
