@@ -81,7 +81,7 @@ export function createGlobeLayer(id, options) {
         node.material.lightPosition = layer.lighting.position;
 
         if (layer.noTextureColor) {
-            node.material.noTextureColor = layer.noTextureColor;
+            node.material.noTextureColor.value.copy(layer.noTextureColor);
         }
 
         if (__DEBUG__) {
@@ -322,12 +322,12 @@ GlobeView.prototype.addLayer = function addLayer(layer) {
  * @param      {string}   layerId      The identifier
  * @return     {boolean}
  */
-GlobeView.prototype.removeLayer = function removeImageryLayer(layerId) {
+GlobeView.prototype.removeLayer = function removeLayer(layerId) {
     const layer = this.getLayers(l => l.id === layerId)[0];
     if (layer && layer.type === 'color' && this.wgs84TileLayer.detach(layer)) {
         var cO = function cO(object) {
-            if (object.removeColorLayer) {
-                object.removeColorLayer(layerId);
+            if (object.removeLayer) {
+                object.removeLayer(layerId);
             }
         };
 

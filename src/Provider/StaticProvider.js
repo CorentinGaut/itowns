@@ -3,7 +3,6 @@ import { Vector4 } from 'three';
 import Extent from '../Core/Geographic/Extent';
 import OGCWebServiceHelper from './OGCWebServiceHelper';
 import Fetcher from './Fetcher';
-import { l_COLOR, l_ELEVATION } from '../Renderer/LayeredMaterialConstants';
 
 function _selectImagesFromSpatialIndex(index, images, extent) {
     return index.search(
@@ -163,17 +162,13 @@ export default {
             return false;
         }
         const s = selectBestImageForExtent(layer, tile.extent);
-
         if (!s) {
             return false;
         }
-        const mat = tile.material;
-        const layerType = layer.type === 'color' ? l_COLOR : l_ELEVATION;
-        const currentTexture = mat.getLayerTextures(layerType, layer.id)[0];
-        if (!currentTexture.file) {
-            return true;
-        }
-        return currentTexture.file != s.image;
+        const materialLayer = tile.material.getLayer(layer.id);
+        const texture = materialLayer && materialLayer.textures[0];
+        const file = texture && texture.file;
+        return !file || file != s.image;
     },
 
     executeCommand(command) {

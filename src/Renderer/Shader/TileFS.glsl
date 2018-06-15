@@ -8,13 +8,9 @@
 // conformance/glsl/bugs/nested-loops-with-break-and-continue.html
 // Resolve CHROME unstable 52
 
-const vec4 CFog = vec4( 0.76, 0.85, 1.0, 1.0);
-const vec4 CWhite = vec4(1.0,1.0,1.0,1.0);
-const vec4 COrange = vec4( 1.0, 0.3, 0.0, 1.0);
-const vec4 CRed = vec4( 1.0, 0.0, 0.0, 1.0);
 
-uniform sampler2D   colorTextures[NUM_TEXTURES];
-uniform vec4        colorOffsetScales[NUM_TEXTURES];
+uniform sampler2D   colorTextures[NUM_FS_TEXTURES];
+uniform vec4        colorOffsetScales[NUM_FS_TEXTURES];
 
 struct Layer {
     int textureOffset;
@@ -23,28 +19,31 @@ struct Layer {
     float opacity;
 };
 
-uniform Layer       colorLayers[NUM_TEXTURES];
-uniform int         colorLayersCount;
+uniform Layer       colorLayers[NUM_FS_TEXTURES];
 uniform int         colorTextureCount;
 
 uniform float       distanceFog;
+const   vec3        fogColor = vec3( 0.76, 0.85, 1.0);
 uniform vec3        lightPosition;
 
 uniform vec3        noTextureColor;
+uniform float       opacity;
 
 // Options global
 uniform bool        selected;
+const   vec3        selectedColor = vec3(1.0, 0.3, 0.0);
 uniform bool        lightingEnabled;
 
 varying vec2        vUv_WGS84;
 varying float       vUv_PM;
 varying vec3        vNormal;
 
-uniform float opacity;
 
 #if defined(DEBUG)
     uniform bool showOutline;
     const float sLine = 0.008;
+    const vec3 pmColor = vec3( 1.0, 0.5, 0.0);
+    const vec3 wgs84Color = vec3( 1.0, 0.0, 0.0);
 #endif
 
 #if defined(MATTE_ID_MODE) || defined(DEPTH_MODE)
@@ -59,7 +58,7 @@ vec4 applyWhiteToInvisibleEffect(vec4 color, float intensity) {
 }
 
 vec4 applyLightColorToInvisibleEffect(vec4 color, float intensity) {
-    float a = max(0.05,1.0 - distance(color.xyz, CWhite.xyz));
+    float a = max(0.05,1. - length(color.xyz - 1.));
     color.a *= 1.0 - pow(abs(a), intensity);
     color.rgb *= color.rgb * color.rgb;
     return color;
@@ -71,7 +70,6 @@ vec3 uvPM;
 vec4 getLayerColor(int i, sampler2D texture, vec4 offsetScale, Layer layer) {
     if ( !(i < colorTextureCount) ) return vec4(0);
     vec3 uv = layer.wgs84 ? uvWGS84 : uvPM;
-    // return vec4(0, uv.z/3., 0, 1);
     if (i != layer.textureOffset + int(uv.z)) return vec4(0);
     vec4 color = texture2D(texture, pitUV(uv.xy, offsetScale));
     if(color.a > 0.0) {
@@ -84,6 +82,9 @@ vec4 getLayerColor(int i, sampler2D texture, vec4 offsetScale, Layer layer) {
             color = applyWhiteToInvisibleEffect(color, layer.effect);
             color.rgb *= color.a;
         }
+    }
+    if (showOutline && uv.x > offsetScale.z) {
+        color *= offsetScale.z; // to darken according to downscaling
     }
     return color * layer.opacity;
 }
@@ -107,18 +108,19 @@ void main() {
 
 #else
 
+    gl_FragColor.a = opacity;
+
     // Reconstruct PM uv and PM subtexture id (see TileGeometry)
     uvWGS84 = vec3(vUv_WGS84, 0.);
-    float y = floor(vUv_PM);
-    uvPM    = vec3(vUv_WGS84.x, vUv_PM - y, int(y));
+    uvPM    = vec3(vUv_WGS84.x, fract(vUv_PM), floor(vUv_PM));
     
     #if defined(DEBUG)
     if (showOutline) {
         if (uvWGS84.x < sLine || 1.0 - uvWGS84.x < sLine || uvWGS84.y < sLine || 1.0 - uvWGS84.y < sLine) {
-            gl_FragColor = CRed;
+            gl_FragColor.rgb = wgs84Color;
             return;
         } else if (uvPM.x < sLine || 1.0 - uvPM.x < sLine || uvPM.y < sLine || 1.0 - uvPM.y < sLine) {
-            gl_FragColor = COrange;
+            gl_FragColor.rgb = pmColor;
             return;
         }
     }
@@ -127,7 +129,7 @@ void main() {
     vec4 layerColor;
     vec3 diffuseColor = noTextureColor;
     #pragma unroll_loop
-    for ( int i = 0; i < NUM_TEXTURES; i ++ ) {
+    for ( int i = 0; i < NUM_FS_TEXTURES; i ++ ) {
         layerColor = getLayerColor( i , colorTextures[ i ], colorOffsetScales[ i ], colorLayers[ i ]);
         // layerColor is alpha-premultiplied
         diffuseColor = layerColor.rgb + diffuseColor * (1.0 - layerColor.a);
@@ -135,7 +137,7 @@ void main() {
 
     // Selected
     if(selected) {
-        diffuseColor = mix(COrange.rgb, diffuseColor, 0.5 );
+        diffuseColor = mix(selectedColor, diffuseColor, 0.5 );
     }
 
     // Fog
@@ -145,12 +147,11 @@ void main() {
         float depth = gl_FragCoord.z / gl_FragCoord.w;
     #endif
     float fogIntensity = 1.0/(exp(depth/distanceFog));
-    gl_FragColor.rgb = mix(CFog.rgb, diffuseColor.rgb, fogIntensity);
+    gl_FragColor.rgb = mix(fogColor, diffuseColor.rgb, fogIntensity);
 
     if(lightingEnabled) {   // Add lighting
         float light = min(2. * dot(vNormal, lightPosition),1.);
         gl_FragColor.rgb *= light;
     }
-    gl_FragColor.a = opacity;
     #endif
 }

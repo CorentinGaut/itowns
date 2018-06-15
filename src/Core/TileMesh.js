@@ -117,11 +117,9 @@ TileMesh.prototype.setTextureElevation = function setTextureElevation(elevation)
     if (this.material === null) {
         return;
     }
-
-    const offsetScale = elevation.pitch || new THREE.Vector4(0, 0, 1, 1);
     this.setBBoxZ(elevation.min, elevation.max);
-
-    this.material.setElevationTexture(elevation.texture, offsetScale);
+    this.material.getElevationLayer().setTexture(0, elevation.texture, elevation.pitch);
+    this.material.updateUniforms();
 };
 
 TileMesh.prototype.setBBoxZ = function setBBoxZ(min, max) {
@@ -142,30 +140,24 @@ TileMesh.prototype.updateGeometricError = function updateGeometricError() {
 };
 
 TileMesh.prototype.isColorLayerLoaded = function isColorLayerLoaded(layerId) {
-    return this.material.getColorLayerLevel(layerId) > EMPTY_TEXTURE_ZOOM;
+    const materialLayer = this.material.getLayer(layerId);
+    return materialLayer && materialLayer.level > EMPTY_TEXTURE_ZOOM;
 };
 
 TileMesh.prototype.isElevationLayerLoaded = function isElevationLayerLoaded() {
-    return this.material.getElevationTexture() !== undefined;
-};
-
-TileMesh.prototype.isColorLayerDownscaled = function isColorLayerDownscaled(layer) {
-    return this.material.getColorLayerLevel(layer.id) < this.getZoomForLayer(layer);
+    const materialLayer = this.material.getElevationLayer();
+    return materialLayer && materialLayer.level > EMPTY_TEXTURE_ZOOM;
 };
 
 TileMesh.prototype.OBB = function OBB() {
     return this.obb;
 };
 
-TileMesh.prototype.getIndexLayerColor = function getIndexLayerColor(idLayer) {
-    return this.material.indexOfColorLayer(idLayer);
-};
-
-TileMesh.prototype.removeColorLayer = function removeColorLayer(idLayer) {
+TileMesh.prototype.removeLayer = function removeLayer(idLayer) {
     if (this.layerUpdateState && this.layerUpdateState[idLayer]) {
         delete this.layerUpdateState[idLayer];
     }
-    this.material.removeColorLayer(idLayer);
+    this.material.removeLayer(idLayer);
 };
 
 TileMesh.prototype.changeSequenceLayers = function changeSequenceLayers(sequence) {

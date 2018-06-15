@@ -42,10 +42,10 @@ export function planarSubdivisionControl(maxLevel, maxDeltaElevationLevel) {
         // Prevent to subdivise the node if the current elevation level
         // we must avoid a tile, with level 20, inherits a level 3 elevation texture.
         // The induced geometric error is much too large and distorts the SSE
-        const currentElevationLevel = node.material.getElevationLayerLevel();
+        const nodeLayer = node.material.getElevationLayer();
         if (node.level < context.maxElevationLevel + maxDeltaElevationLevel &&
-            currentElevationLevel >= 0 &&
-            (node.level - currentElevationLevel) >= maxDeltaElevationLevel) {
+            nodeLayer.level >= 0 &&
+            (node.level - nodeLayer.level) >= maxDeltaElevationLevel) {
             return false;
         }
 

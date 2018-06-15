@@ -1,5 +1,6 @@
+#if NUM_VS_TEXTURES > 0
     if(elevationTextureCount > 0) {
-        uv = uv * displacementOffsetScale.z + displacementOffsetScale.xy;
+        uv = uv * displacementOffsetScale.zw + displacementOffsetScale.xy;
 
         #if defined(RGBA_TEXTURE_ELEVATION)
             vec4 rgba = texture2D( displacementMap, uv ) * 255.0;
@@ -26,3 +27,4 @@
 
         transformed += normal * ( dv * displacementScale + displacementBias );
     }
+#endif
