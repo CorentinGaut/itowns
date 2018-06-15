@@ -131,21 +131,25 @@ LayeredMaterial.prototype = Object.create(THREE.RawShaderMaterial.prototype);
 LayeredMaterial.prototype.constructor = LayeredMaterial;
 
 LayeredMaterial.prototype.updateUniforms = function updateUniforms() {
-    let count = 0;
+    const maxCount = this.defines.NUM_TEXTURES;
+    let colorTextureCount = 0;
     for (const layer of this.paramLayers) {
-        if (layer.visible && layer.opacity > 0) {
-            layer.textureOffset = count;
+        if (layer.visible && layer.opacity > 0 && colorTextureCount < maxCount) {
+            layer.textureOffset = colorTextureCount;
             for (let i = 0, il = layer.textures && layer.textures.length; i < il; ++i) {
-                this.uniforms.colorOffsetScales.value[count] = layer.offsetScales[i];
-                this.uniforms.colorTextures.value[count] = layer.textures[i];
-                this.uniforms.colorLayers.value[count] = layer;
+                if (colorTextureCount == maxCount) {
+                    console.warn(`Reaching the maximum number of texture units (${maxCount}), discarding further tiles.`);
+                    break;
+                }
+                this.uniforms.colorOffsetScales.value[colorTextureCount] = layer.offsetScales[i];
+                this.uniforms.colorTextures.value[colorTextureCount] = layer.textures[i];
+                this.uniforms.colorLayers.value[colorTextureCount] = layer;
                 i++;
-                count++;
-                // if (count > ) warn/break
+                colorTextureCount++;
             }
         }
     }
-    this.uniforms.colorTextureCount.value = count;
+    this.uniforms.colorTextureCount.value = colorTextureCount;
     this.uniforms.elevationTextureCount.value = this.elevationTextures[0] ? 0 : 1;
 
     this.uniforms.opacity.value = this.opacity;
