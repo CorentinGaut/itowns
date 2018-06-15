@@ -39,12 +39,6 @@ export function unpack1K(color, factor) {
     return factor ? bitSh.dot(color) * factor : bitSh.dot(color);
 }
 
-// Array not suported in IE
-var fillArray = function fillArray(array, remp) {
-    for (var i = 0; i < array.length; i++)
-        { array[i] = remp; }
-};
-
 const LayeredMaterial = function LayeredMaterial(options = {}) {
     THREE.RawShaderMaterial.call(this);
     this.defines = {};
@@ -73,20 +67,15 @@ const LayeredMaterial = function LayeredMaterial(options = {}) {
     this.vertexShader = TileVS;
     this.fragmentShader = ShaderUtils.unrollLoops(TileFS, this.defines);
 
-
-    this.paramLayers = [];
-
     // Elevation properties
     this.elevationOffsetScales = [vector4];
     this.elevationTextures = [null];
 
     // Color properties
     this.noTextureColor = new THREE.Color(0.04, 0.23, 0.35);
-    this.colorLayers = Array(nbSamplers);
-    this.colorOffsetScales = Array(nbSamplers);
+    this.colorLayers = Array(nbSamplers).fill({ textures: [] });
+    this.colorOffsetScales = Array(nbSamplers).fill(vector4);
     this.colorTextures = Array(nbSamplers);
-    fillArray(this.colorOffsetScales, vector4);
-    fillArray(this.colorLayers, {});
 
     // Lighting properties
     this.lightPosition = new THREE.Vector3(-0.5, 0.0, 1.0);
@@ -131,12 +120,20 @@ LayeredMaterial.prototype = Object.create(THREE.RawShaderMaterial.prototype);
 LayeredMaterial.prototype.constructor = LayeredMaterial;
 
 LayeredMaterial.prototype.updateUniforms = function updateUniforms() {
+    // Elevation uniforms
+    this.uniforms.elevationTextureCount.value = this.elevationTextures[0] ? 0 : 1;
+
+    // Color uniforms, flattening the array of array colorLayers[i].textures[j]
+    this.uniforms.showOutline.value = this.showOutline;
+    this.uniforms.opacity.value = this.opacity;
+    this.uniforms.noTextureColor.value.copy(this.noTextureColor);
+
     const maxCount = this.defines.NUM_TEXTURES;
     let colorTextureCount = 0;
-    for (const layer of this.paramLayers) {
+    for (const layer of this.colorLayers) {
         if (layer.visible && layer.opacity > 0 && colorTextureCount < maxCount) {
             layer.textureOffset = colorTextureCount;
-            for (let i = 0, il = layer.textures && layer.textures.length; i < il; ++i) {
+            for (let i = 0, il = layer.textures.length; i < il; ++i) {
                 if (colorTextureCount == maxCount) {
                     console.warn(`Reaching the maximum number of texture units (${maxCount}), discarding further tiles.`);
                     break;
@@ -144,22 +141,21 @@ LayeredMaterial.prototype.updateUniforms = function updateUniforms() {
                 this.uniforms.colorOffsetScales.value[colorTextureCount] = layer.offsetScales[i];
                 this.uniforms.colorTextures.value[colorTextureCount] = layer.textures[i];
                 this.uniforms.colorLayers.value[colorTextureCount] = layer;
-                i++;
                 colorTextureCount++;
             }
         }
     }
     this.uniforms.colorTextureCount.value = colorTextureCount;
-    this.uniforms.elevationTextureCount.value = this.elevationTextures[0] ? 0 : 1;
 
-    this.uniforms.opacity.value = this.opacity;
-    this.uniforms.showOutline.value = this.showOutline;
+    // Lighting uniforms
     this.uniforms.lightingEnabled.value = this.lightingEnabled;
+    this.uniforms.lightPosition.value.copy(this.lightPosition);
+
+    // Misc uniforms
+    this.uniforms.distanceFog.value = this.distanceFog;
     this.uniforms.selected.value = this.selected;
     this.uniforms.uuid.value = this.uuid;
-    this.uniforms.distanceFog.value = this.distanceFog;
-    this.uniforms.noTextureColor.value.copy(this.noTextureColor);
-    this.uniforms.lightPosition.value.copy(this.lightPosition);
+
     this.uniformsNeedUpdate = true;
 };
 
@@ -169,29 +165,28 @@ LayeredMaterial.prototype.dispose = function dispose() {
     this.dispatchEvent({
         type: 'dispose',
     });
-    for (const layer of this.paramLayers) {
+    for (const layer of this.colorLayers) {
         for (const texture of layer.textures) {
             if (texture instanceof THREE.Texture) {
                 texture.dispose();
             }
-            layer.textures = [];
-            layer.offsetScales = [];
         }
+        layer.textures = [];
     }
 };
 
 LayeredMaterial.prototype.setSequence = function setSequence(sequenceLayer) {
-    // console.log('sequenceLayer', sequenceLayer, this.paramLayers);
-    const paramLayers = [];
+    // console.log('sequenceLayer', sequenceLayer, this.colorLayers);
+    const colorLayers = [];
     for (let l = 0; l < sequenceLayer.length; l++) {
         const layer = this.getColorLayer(sequenceLayer[l]);
         if (layer) {
-            paramLayers.push(layer);
+            colorLayers.push(layer);
         }
     }
-    this.paramLayers = paramLayers;
+    this.colorLayers = colorLayers;
     this.updateUniforms();
-    // console.log('sequenceLayer', sequenceLayer, this.paramLayers);
+    // console.log('sequenceLayer', sequenceLayer, this.colorLayers);
 };
 
 LayeredMaterial.prototype.removeColorLayer = function removeColorLayer(layerId) {
@@ -199,26 +194,24 @@ LayeredMaterial.prototype.removeColorLayer = function removeColorLayer(layerId) 
     if (layerIndex === -1) {
         return;
     }
-    // Remove Layers Parameters
-    var layer = this.paramLayers.splice(layerIndex, 1)[0];
-
-    // Dispose Layers textures
+    // Dispose layer textures
+    const layer = this.colorLayers[layerIndex];
     for (const texture of layer.textures) {
         if (texture instanceof THREE.Texture) {
             texture.dispose();
         }
         layer.textures = [];
-        layer.offsetScales = [];
     }
+    this.colorLayers.splice(layerIndex, 1);
     this.updateUniforms();
-    // console.log('removeColorLayer', layer, this.paramLayers);
+    // console.log('removeColorLayer', layer, this.colorLayers);
 };
 
 LayeredMaterial.prototype.setColorTextures = function setColorTextures(textures, layerId) {
     const layer = this.getColorLayer(layerId);
-    for (let i = 0, max = textures.length; i < max; i++) {
+    for (let i = 0, il = textures.length; i < il; i++) {
         if (textures[i]) {
-            this.setColorTexture(textures[i].texture, textures[i].pitch, i, layer);
+            this.pushColorTexture(layer, textures[i].texture, textures[i].pitch);
         }
     }
     // console.log('setColorTexturesLayer', layer);
@@ -227,42 +220,39 @@ LayeredMaterial.prototype.setColorTextures = function setColorTextures(textures,
 LayeredMaterial.prototype.setElevationTexture = function setElevationTexture(texture, offsetScale, index = 0) {
     this.elevationTextures[index] = texture || null;
     this.elevationOffsetScales[index] = offsetScale || new THREE.Vector4(0.0, 0.0, 1.0, 1.0);
-    // console.log('setElevationTexture', layer.id, this.paramLayers);
+    // console.log('setElevationTexture', layer.id, this.colorLayers);
 };
 
-LayeredMaterial.prototype.setColorTexture = function setTexture(texture, offsetScale, index, layer) {
-    layer.textures[index] = texture || null;
-    layer.offsetScales[index] = offsetScale || new THREE.Vector4(0.0, 0.0, 1.0, 1.0);
-    // console.log('setColorTexture', layer.id, this.paramLayers);
+LayeredMaterial.prototype.pushColorTexture = function pushColorTexture(layer, texture, offsetScale) {
+    if (texture) {
+        layer.textures.push(texture);
+        layer.offsetScales.push(offsetScale || new THREE.Vector4(0.0, 0.0, 1.0, 1.0));
+    }
+    // console.log('setColorTexture', layer.id, this.colorLayers);
 };
 
 LayeredMaterial.prototype.pushLayer = function pushLayer(param) {
-    this.paramLayers.push({
+    this.colorLayers.push({
         id: param.idLayer,
-        textureCount: param.texturesCount,
+        textureOffset: 0, // will be updated in updateUniforms()
+        wgs84: param.texturesCount == 1,
         effect: param.fx,
         opacity: param.opacity,
-        visible: param.visible,
         textures: [],
         offsetScales: [],
     });
-    // console.log('pushLayer', param.idLayer, this.paramLayers);
+    // console.log('pushLayer', param.idLayer, this.colorLayers);
 };
 
 LayeredMaterial.prototype.indexOfColorLayer = function indexOfColorLayer(layerId) {
-    return this.paramLayers.findIndex(layer => layer.id === layerId);
+    return this.colorLayers.findIndex(layer => layer.id === layerId);
 };
 
 LayeredMaterial.prototype.getColorLayer = function getColorLayer(layerId) {
-    return this.paramLayers.find(layer => layer.id === layerId);
+    return this.colorLayers.find(layer => layer.id === layerId);
 };
 
-LayeredMaterial.prototype.isColorLayerDownscaled = function isColorLayerDownscaled(layerId, zoom) {
-    const layer = this.getColorLayer(layerId);
-    return layer && layer.textures[0] ? layer.textures[0].coords.zoom < zoom : true;
-};
-
-LayeredMaterial.prototype.getColorLayerLevelById = function getColorLayerLevelById(layerId) {
+LayeredMaterial.prototype.getColorLayerLevel = function getColorLayerLevel(layerId) {
     const layer = this.getColorLayer(layerId);
     return layer && layer.textures[0] ? layer.textures[0].coords.zoom : EMPTY_TEXTURE_ZOOM;
 };

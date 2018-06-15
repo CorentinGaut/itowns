@@ -359,6 +359,7 @@ GlobeView.prototype.selectNodeAt = function selectNodeAt(mouse) {
 
     for (const n of this.wgs84TileLayer.level0Nodes) {
         n.traverse((node) => {
+            if (!node.material) return;
             node.material.selected = node.id === selectedId;
             if (node.material.updateUniforms) {
                 node.material.updateUniforms();

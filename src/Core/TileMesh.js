@@ -141,23 +141,16 @@ TileMesh.prototype.updateGeometricError = function updateGeometricError() {
     this.geometricError = this.boundingSphere.radius / SIZE_TEXTURE_TILE;
 };
 
-TileMesh.prototype.getLayerTextures = function getLayerTextures(layerType, layerId) {
-    const mat = this.material;
-    return mat.getLayerTextures(layerType, layerId);
-};
-
 TileMesh.prototype.isColorLayerLoaded = function isColorLayerLoaded(layerId) {
-    const mat = this.material;
-    return mat.getColorLayerLevelById(layerId) > EMPTY_TEXTURE_ZOOM;
+    return this.material.getColorLayerLevel(layerId) > EMPTY_TEXTURE_ZOOM;
 };
 
 TileMesh.prototype.isElevationLayerLoaded = function isElevationLayerLoaded() {
-    return this.material.elevationTextures[0];
+    return this.material.getElevationTexture() !== undefined;
 };
 
 TileMesh.prototype.isColorLayerDownscaled = function isColorLayerDownscaled(layer) {
-    const mat = this.material;
-    return mat.isColorLayerDownscaled(layer.id, this.getZoomForLayer(layer));
+    return this.material.getColorLayerLevel(layer.id) < this.getZoomForLayer(layer);
 };
 
 TileMesh.prototype.OBB = function OBB() {

@@ -34,14 +34,12 @@ export default function createTileDebugUI(datDebugTool, view, layer, debugInstan
     };
 
     // tiles outline
-    gui.add(layer, 'showOutline').name('Show tiles outline').onChange((newValue) => {
+    gui.add(layer, 'showOutline').name('Show tiles').onChange((newValue) => {
         layer.showOutline = newValue;
 
         applyToNodeFirstMaterial(view, layer.object3d, layer.id, (material) => {
-            if (material.uniforms) {
-                material.uniforms.showOutline = { value: newValue };
-                material.needsUpdate = true;
-            }
+            material.showOutline = newValue;
+            material.updateUniforms();
         });
     });
 

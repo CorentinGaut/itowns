@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import Coordinates from '../Core/Geographic/Coordinates';
-import { l_ELEVATION } from '../Renderer/LayeredMaterialConstants';
 
 const FAST_READ_Z = 0;
 const PRECISE_READ_Z = 1;
@@ -169,7 +168,7 @@ function tileAt(pt, tile) {
                 return t;
             }
         }
-        if (tile.getLayerTextures(l_ELEVATION)[0]) {
+        if (tile.material.getElevationTexture()) {
             return tile;
         }
         return undefined;
@@ -371,7 +370,7 @@ function _readZ(layer, method, coord, nodes, cache) {
     }
 
     const tile = tileWithValidElevationTexture;
-    const src = tileWithValidElevationTexture.getLayerTextures(l_ELEVATION)[0];
+    const src = tileWithValidElevationTexture.material.getElevationTexture();
 
     // check cache value if existing
     if (cache) {

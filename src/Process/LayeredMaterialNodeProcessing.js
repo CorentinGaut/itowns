@@ -10,20 +10,19 @@ import { computeMinMaxElevation } from '../Parser/XbilParser';
 const MAX_RETRY = 4;
 
 function initNodeImageryTexturesFromParent(node, parent, layer) {
-    if (parent.material && parent.material.getColorLayerLevelById(layer.id) > EMPTY_TEXTURE_ZOOM) {
+    const parentLayer = parent.material && parent.material.getColorLayer(layer.id);
+    if (parentLayer && parent.material.getColorLayerLevel(layer.id) > EMPTY_TEXTURE_ZOOM) {
+        const colorLayer = node.material.getColorLayer(layer.id);
         const coords = node.getCoordsForLayer(layer);
-        const colorLayer = Object.assign({}, node.material.getColorLayer(layer.id)); // clone it
-        node.material.paramLayers.push(colorLayer);
-
         for (const c of coords) {
-            for (const texture of colorLayer.textures) {
+            for (const texture of parentLayer.textures) {
                 if (c.isInside(texture.coords)) {
-                    colorLayer.offsetScales.push(c.offsetToParent(texture.coords));
-                    colorLayer.textures.push(texture);
+                    node.material.pushColorTexture(colorLayer, texture, c.offsetToParent(texture.coords));
                     break;
                 }
             }
         }
+        node.material.updateUniforms();
     }
 }
 
@@ -173,8 +172,11 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
             const imageryLayers = context.view.getLayers(l => l.type === 'color');
             const sequence = ImageryLayers.getColorLayersIdOrderedBySequence(imageryLayers);
             material.setSequence(sequence);
-
+            console.log(material.colorLayers.map(l => l.offsetScales.length));
             initNodeImageryTexturesFromParent(node, node.parent, layer);
+            console.log(material.colorLayers.map(l => l.offsetScales));
+            
+            console.log('---');
         }
 
         // Proposed new process, two separate processes:
@@ -184,7 +186,7 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
         // The two-step allows you to filter out unnecessary requests
         // Indeed in the second pass, their state (not visible or not displayed) can block them to fetch
         const minLevel = layer.options.zoom ? layer.options.zoom.min : 0;
-        if (node.material.getColorLayerLevelById(layer.id) >= minLevel) {
+        if (node.material.getColorLayerLevel(layer.id) >= minLevel) {
             context.view.notifyChange(false, node);
             return;
         }
@@ -232,7 +234,7 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
     }
 
     const failureParams = node.layerUpdateState[layer.id].failureParams;
-    const currentLevel = node.material.getColorLayerLevelById(layer.id);
+    const currentLevel = node.material.getColorLayerLevel(layer.id);
     const nodeLevel = node.getCoordsForLayer(layer)[0].zoom || node.level;
     const targetLevel = chooseNextLevelToFetch(layer.updateStrategy.type, node, nodeLevel, currentLevel, layer, failureParams);
     if (targetLevel <= currentLevel) {

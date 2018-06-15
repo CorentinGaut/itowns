@@ -13,15 +13,14 @@ const vec4 CWhite = vec4(1.0,1.0,1.0,1.0);
 const vec4 COrange = vec4( 1.0, 0.3, 0.0, 1.0);
 const vec4 CRed = vec4( 1.0, 0.0, 0.0, 1.0);
 
-
 uniform sampler2D   colorTextures[NUM_TEXTURES];
 uniform vec4        colorOffsetScales[NUM_TEXTURES];
 
 struct Layer {
-    int textureOffset; // x
-    int textureCount;  // y
-    float effect;      // z
-    float opacity;     // w
+    int textureOffset;
+    bool wgs84;
+    float effect;
+    float opacity;
 };
 
 uniform Layer       colorLayers[NUM_TEXTURES];
@@ -71,8 +70,8 @@ vec3 uvPM;
 
 vec4 getLayerColor(int i, sampler2D texture, vec4 offsetScale, Layer layer) {
     if ( !(i < colorTextureCount) ) return vec4(0);
-    bool projWGS84 = layer.textureCount == 1;
-    vec3 uv = projWGS84 ? uvWGS84 : uvPM;
+    vec3 uv = layer.wgs84 ? uvWGS84 : uvPM;
+    // return vec4(0, uv.z/3., 0, 1);
     if (i != layer.textureOffset + int(uv.z)) return vec4(0);
     vec4 color = texture2D(texture, pitUV(uv.xy, offsetScale));
     if(color.a > 0.0) {
