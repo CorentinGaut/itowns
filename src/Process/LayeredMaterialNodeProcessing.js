@@ -1,4 +1,4 @@
-import { l_ELEVATION, l_COLOR, EMPTY_TEXTURE_ZOOM } from '../Renderer/LayeredMaterialConstants';
+import { EMPTY_TEXTURE_ZOOM } from '../Renderer/LayeredMaterialConstants';
 import { chooseNextLevelToFetch } from '../Core/Layer/LayerUpdateStrategy';
 import LayerUpdateState from '../Core/Layer/LayerUpdateState';
 import { ImageryLayers } from '../Core/Layer/Layer';
@@ -12,24 +12,16 @@ const MAX_RETRY = 4;
 function initNodeImageryTexturesFromParent(node, parent, layer) {
     if (parent.material && parent.material.getColorLayerLevelById(layer.id) > EMPTY_TEXTURE_ZOOM) {
         const coords = node.getCoordsForLayer(layer);
-        const offsetTextures = node.material.getLayerTextureOffset(layer.id);
+        const colorLayer = Object.assign({}, node.material.getColorLayer(layer.id)); // clone it
+        node.material.paramLayers.push(colorLayer);
 
-        let textureIndex = offsetTextures;
         for (const c of coords) {
-            for (const texture of parent.material.getLayerTextures(l_COLOR, layer.id)) {
+            for (const texture of colorLayer.textures) {
                 if (c.isInside(texture.coords)) {
-                    const result = c.offsetToParent(texture.coords);
-                    node.material.textures[l_COLOR][textureIndex] = texture;
-                    node.material.offsetScale[l_COLOR][textureIndex] = result;
-                    textureIndex++;
+                    colorLayer.offsetScales.push(c.offsetToParent(texture.coords));
+                    colorLayer.textures.push(texture);
                     break;
                 }
-            }
-        }
-
-        if (__DEBUG__) {
-            if ((textureIndex - offsetTextures) != coords.length) {
-                console.error(`non-coherent result ${textureIndex} ${offsetTextures} vs ${coords.length}.`, coords);
             }
         }
     }
@@ -43,8 +35,8 @@ function initNodeElevationTextureFromParent(node, parent, layer) {
     if (parent.material && parent.material.getElevationLayerLevel() > node.material.getElevationLayerLevel()) {
         const coords = node.getCoordsForLayer(layer);
 
-        const texture = parent.material.textures[l_ELEVATION][0];
-        const pitch = coords[0].offsetToParent(parent.material.textures[l_ELEVATION][0].coords);
+        const texture = parent.material.getElevationTexture();
+        const pitch = coords[0].offsetToParent(texture.coords);
         const elevation = {
             texture,
             pitch,
@@ -80,10 +72,10 @@ function getIndiceWithPitch(i, pitch, w) {
 }
 
 function insertSignificantValuesFromParent(texture, node, parent, layer) {
-    if (parent.material && parent.material.getElevationLayerLevel() > EMPTY_TEXTURE_ZOOM) {
+    const textureParent = parent.material && parent.material.getElevationTexture();
+    if (textureParent) {
         const coords = node.getCoordsForLayer(layer);
-        const textureParent = parent.material.textures[l_ELEVATION][0];
-        const pitch = coords[0].offsetToParent(parent.material.textures[l_ELEVATION][0].coords);
+        const pitch = coords[0].offsetToParent(textureParent.coords);
         const tData = texture.image.data;
         const l = tData.length;
 
@@ -271,11 +263,10 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
             if (node.material === null) {
                 return;
             }
-
             if (Array.isArray(result)) {
-                node.setTexturesLayer(result, l_COLOR, layer.id);
+                node.material.setColorTextures(result, layer.id);
             } else if (result.texture) {
-                node.setTexturesLayer([result], l_COLOR, layer.id);
+                node.material.setColorTextures([result], layer.id);
             } else {
                 // TODO: null texture is probably an error
                 // Maybe add an error counter for the node/layer,
@@ -358,10 +349,6 @@ export function updateLayeredMaterialNodeElevation(context, layer, node) {
         return Promise.resolve();
     }
 
-    // TODO
-    if (material.elevationLayersId.length === 0) {
-        material.elevationLayersId.push(layer.id);
-    }
     node.layerUpdateState[layer.id].newTry();
 
     const command = {

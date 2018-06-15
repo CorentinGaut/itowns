@@ -14,19 +14,19 @@ const vec4 COrange = vec4( 1.0, 0.3, 0.0, 1.0);
 const vec4 CRed = vec4( 1.0, 0.0, 0.0, 1.0);
 
 
-uniform sampler2D   dTextures_01[NUM_TEXTURES];
-uniform vec4        offsetScale_L01[NUM_TEXTURES];
+uniform sampler2D   colorTextures[NUM_TEXTURES];
+uniform vec4        colorOffsetScales[NUM_TEXTURES];
 
 struct Layer {
     int textureOffset; // x
     int textureCount;  // y
     float effect;      // z
     float opacity;     // w
-    bool visible;      // visibility
 };
 
-uniform Layer       paramLayers[NUM_LAYERS];
+uniform Layer       colorLayers[NUM_TEXTURES];
 uniform int         colorLayersCount;
+uniform int         colorTextureCount;
 
 uniform float       distanceFog;
 uniform vec3        lightPosition;
@@ -66,20 +66,27 @@ vec4 applyLightColorToInvisibleEffect(vec4 color, float intensity) {
     return color;
 }
 
-vec4 getLayerColor(sampler2D texture,vec4 offsetScale, vec2 uv, Layer param) {
-    vec4 color = texture2D(texture, pitUV(uv, offsetScale));
+vec3 uvWGS84;
+vec3 uvPM;
+
+vec4 getLayerColor(int i, sampler2D texture, vec4 offsetScale, Layer layer) {
+    if ( !(i < colorTextureCount) ) return vec4(0);
+    bool projWGS84 = layer.textureCount == 1;
+    vec3 uv = projWGS84 ? uvWGS84 : uvPM;
+    if (i != layer.textureOffset + int(uv.z)) return vec4(0);
+    vec4 color = texture2D(texture, pitUV(uv.xy, offsetScale));
     if(color.a > 0.0) {
-        if(param.effect > 2.0) {
+        if(layer.effect > 2.0) {
             color.rgb /= color.a;
-            color = applyLightColorToInvisibleEffect(color, param.effect);
+            color = applyLightColorToInvisibleEffect(color, layer.effect);
             color.rgb *= color.a;
-        } else if(param.effect > 0.0) {
+        } else if(layer.effect > 0.0) {
             color.rgb /= color.a;
-            color = applyWhiteToInvisibleEffect(color, param.effect);
+            color = applyWhiteToInvisibleEffect(color, layer.effect);
             color.rgb *= color.a;
         }
     }
-    return color * param.opacity;
+    return color * layer.opacity;
 }
 
 
@@ -102,11 +109,9 @@ void main() {
 #else
 
     // Reconstruct PM uv and PM subtexture id (see TileGeometry)
-    vec2 uvWGS84 = vUv_WGS84;
-    vec2 uvPM    = vUv_WGS84;
-    float y      = floor(vUv_PM);
-    uvPM.y       = vUv_PM - y;
-    int pmSubTextureIndex = int(y);
+    uvWGS84 = vec3(vUv_WGS84, 0.);
+    float y = floor(vUv_PM);
+    uvPM    = vec3(vUv_WGS84.x, vUv_PM - y, int(y));
     
     #if defined(DEBUG)
     if (showOutline) {
@@ -120,25 +125,13 @@ void main() {
     }
     #endif
 
+    vec4 layerColor;
     vec3 diffuseColor = noTextureColor;
-    for (int layer = 0; layer < NUM_LAYERS; layer++) {
-        if(layer == colorLayersCount) {
-            break;
-        }
-        Layer param = paramLayers[layer];
-        bool projWGS84 = param.textureCount == 1;
-        int subTextureIndex = projWGS84 ? 0 : pmSubTextureIndex;
-        vec4 layerColor = vec4(0.);
-        if( param.visible && param.opacity > 0. && subTextureIndex < param.textureCount) {
-            vec2 uv = projWGS84 ? uvWGS84 : uvPM;
-            int textureIndex = param.textureOffset + subTextureIndex;
-            #pragma unroll_loop
-            for ( int i = 0; i < NUM_TEXTURES; i ++ ) {
-                if ( textureIndex == i ) layerColor = getLayerColor(dTextures_01[ i ], offsetScale_L01[ i ], uv, param);
-            }
-            // layerColor is alpha-premultiplied
-            diffuseColor = layerColor.rgb + diffuseColor * (1.0 - layerColor.a);
-        }
+    #pragma unroll_loop
+    for ( int i = 0; i < NUM_TEXTURES; i ++ ) {
+        layerColor = getLayerColor( i , colorTextures[ i ], colorOffsetScales[ i ], colorLayers[ i ]);
+        // layerColor is alpha-premultiplied
+        diffuseColor = layerColor.rgb + diffuseColor * (1.0 - layerColor.a);
     }
 
     // Selected

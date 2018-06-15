@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 import LayeredMaterial from '../Renderer/LayeredMaterial';
-import { l_ELEVATION } from '../Renderer/LayeredMaterialConstants';
+import { EMPTY_TEXTURE_ZOOM } from '../Renderer/LayeredMaterialConstants';
 import RendererConstant from '../Renderer/RendererConstant';
 import OGCWebServiceHelper, { SIZE_TEXTURE_TILE } from '../Provider/OGCWebServiceHelper';
 import { is4326 } from './Geographic/Coordinates';
@@ -121,9 +121,8 @@ TileMesh.prototype.setTextureElevation = function setTextureElevation(elevation)
     const offsetScale = elevation.pitch || new THREE.Vector4(0, 0, 1, 1);
     this.setBBoxZ(elevation.min, elevation.max);
 
-    this.material.setTexture(elevation.texture, l_ELEVATION, 0, offsetScale);
+    this.material.setElevationTexture(elevation.texture, offsetScale);
 };
-
 
 TileMesh.prototype.setBBoxZ = function setBBoxZ(min, max) {
     if (min == undefined && max == undefined) {
@@ -142,15 +141,6 @@ TileMesh.prototype.updateGeometricError = function updateGeometricError() {
     this.geometricError = this.boundingSphere.radius / SIZE_TEXTURE_TILE;
 };
 
-TileMesh.prototype.setTexturesLayer = function setTexturesLayer(textures, layerType, layerId) {
-    if (this.material === null) {
-        return;
-    }
-    if (textures) {
-        this.material.setTexturesLayer(textures, layerType, layerId);
-    }
-};
-
 TileMesh.prototype.getLayerTextures = function getLayerTextures(layerType, layerId) {
     const mat = this.material;
     return mat.getLayerTextures(layerType, layerId);
@@ -158,11 +148,11 @@ TileMesh.prototype.getLayerTextures = function getLayerTextures(layerType, layer
 
 TileMesh.prototype.isColorLayerLoaded = function isColorLayerLoaded(layerId) {
     const mat = this.material;
-    return mat.getColorLayerLevelById(layerId) > -1;
+    return mat.getColorLayerLevelById(layerId) > EMPTY_TEXTURE_ZOOM;
 };
 
 TileMesh.prototype.isElevationLayerLoaded = function isElevationLayerLoaded() {
-    return this.material.textures[l_ELEVATION].length > 0;
+    return this.material.elevationTextures[0];
 };
 
 TileMesh.prototype.isColorLayerDownscaled = function isColorLayerDownscaled(layer) {
@@ -186,13 +176,6 @@ TileMesh.prototype.removeColorLayer = function removeColorLayer(idLayer) {
 };
 
 TileMesh.prototype.changeSequenceLayers = function changeSequenceLayers(sequence) {
-    const layerCount = this.material.getColorLayersCount();
-
-    // Quit if there is only one layer
-    if (layerCount < 2) {
-        return;
-    }
-
     this.material.setSequence(sequence);
 };
 

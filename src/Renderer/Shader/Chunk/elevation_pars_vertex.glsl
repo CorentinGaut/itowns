@@ -1,10 +1,10 @@
 
-uniform sampler2D   dTextures_00[1];
-uniform vec3        offsetScale_L00[1];
+uniform sampler2D   elevationTextures[1];
+uniform vec3        elevationOffsetScales[1];
 uniform int         elevationTextureCount;
 
-#define displacementMap         (dTextures_00[0])
-#define displacementOffsetScale (offsetScale_L00[0])
+#define displacementMap         (elevationTextures[0])
+#define displacementOffsetScale (elevationOffsetScales[0])
 #define displacementScale       (1.)
 #define displacementBias        (0.)
 
