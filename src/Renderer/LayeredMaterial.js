@@ -29,11 +29,16 @@ export function unpack1K(color, factor) {
     return factor ? bitSh.dot(color) * factor : bitSh.dot(color);
 }
 
+const CRS_DEFINES = {
+    WGS84: 0,
+    PM: 1,
+};
+
 class LayeredMaterialLayer {
     constructor(options) {
         this.id = options.id;
         this.textureOffset = 0; // will be updated in updateUniforms()
-        this.wgs84 = (options.texturesCount !== undefined ? options.texturesCount : 1) == 1;
+        this.crs = CRS_DEFINES[options.tileMT || 'WGS84'];
         this.effect = options.effect !== undefined ? options.effect : 0;
         this.opacity = options.opacity !== undefined ? options.opacity : 1;
         this.visible = options.visible !== undefined ? options.visible : true;
@@ -93,6 +98,10 @@ class LayeredMaterial extends THREE.RawShaderMaterial {
 
         this.defines.NUM_VS_TEXTURES = nbSamplers[0];
         this.defines.NUM_FS_TEXTURES = nbSamplers[1];
+
+        Object.keys(CRS_DEFINES).forEach((crs) => {
+            this.defines[`CRS_${crs}`] = CRS_DEFINES[crs];
+        });
 
         if (__DEBUG__) {
             this.defines.DEBUG = 1;

@@ -14,7 +14,7 @@ uniform vec4        colorOffsetScales[NUM_FS_TEXTURES];
 
 struct Layer {
     int textureOffset;
-    bool wgs84;
+    int crs;
     float effect;
     float opacity;
 };
@@ -69,7 +69,7 @@ vec3 uvPM;
 
 vec4 getLayerColor(int i, sampler2D texture, vec4 offsetScale, Layer layer) {
     if ( !(i < colorTextureCount) ) return vec4(0);
-    vec3 uv = layer.wgs84 ? uvWGS84 : uvPM;
+    vec3 uv = (layer.crs == CRS_PM) ? uvPM : uvWGS84;
     if (i != layer.textureOffset + int(uv.z)) return vec4(0);
     vec4 color = texture2D(texture, pitUV(uv.xy, offsetScale));
     if(color.a > 0.0) {
