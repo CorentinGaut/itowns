@@ -31,10 +31,6 @@ export function createPlanarLayer(id, extent, options) {
             node.material.showOutline = layer.showOutline || false;
             node.material.wireframe = layer.wireframe || false;
         }
-
-        if (node.material.updateUniforms) {
-            node.material.updateUniforms();
-        }
     };
 
     tileLayer.preUpdate = (context, layer, changeSources) => {
@@ -162,9 +158,6 @@ PlanarView.prototype.selectNodeAt = function selectNodeAt(mouse) {
     for (const n of this.tileLayer.level0Nodes) {
         n.traverse((node) => {
             node.material.selected = node.id === selectedId;
-            if (node.material.updateUniforms) {
-                node.material.updateUniforms();
-            }
             if (node.material.selected) {
                 // eslint-disable-next-line no-console
                 console.info(node);

@@ -84,10 +84,6 @@ export function createPanoramaLayer(id, coordinates, type, options = {}) {
             node.material.showOutline = layer.showOutline || false;
             node.material.wireframe = layer.wireframe || false;
         }
-
-        if (node.material.updateUniforms) {
-            node.material.updateUniforms();
-        }
     };
 
     tileLayer.preUpdate = (context, layer, changeSources) => {

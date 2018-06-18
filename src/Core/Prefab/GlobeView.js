@@ -88,10 +88,6 @@ export function createGlobeLayer(id, options) {
             node.material.showOutline = layer.showOutline || false;
             node.material.wireframe = layer.wireframe || false;
         }
-
-        if (node.material.updateUniforms) {
-            node.material.updateUniforms();
-        }
     };
 
     const wgs84TileLayer = new GeometryLayer(id, options.object3d || new THREE.Group());
@@ -361,9 +357,6 @@ GlobeView.prototype.selectNodeAt = function selectNodeAt(mouse) {
         n.traverse((node) => {
             if (!node.material) return;
             node.material.selected = node.id === selectedId;
-            if (node.material.updateUniforms) {
-                node.material.updateUniforms();
-            }
             if (node.material.selected) {
                 // eslint-disable-next-line no-console
                 console.info(node);

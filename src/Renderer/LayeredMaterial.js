@@ -135,11 +135,13 @@ class LayeredMaterial extends THREE.RawShaderMaterial {
         this.elevationLayerIds = [];
         this.colorLayerIds = [];
 
-        // layer uniforms, to be updated using updateUniforms()
+        // elevation layer uniforms, to be updated using updateUniforms()
         this.uniforms.elevationLayers = new THREE.Uniform(new Array(nbSamplers[0]).fill({}));
         this.uniforms.elevationTextures = new THREE.Uniform(new Array(nbSamplers[0]).fill(null));
         this.uniforms.elevationOffsetScales = new THREE.Uniform(new Array(nbSamplers[0]).fill(identityOffsetScale));
         this.uniforms.elevationTextureCount = new THREE.Uniform(0);
+
+        // color layer uniforms, to be updated using updateUniforms()
         this.uniforms.colorLayers = new THREE.Uniform(new Array(nbSamplers[1]).fill({}));
         this.uniforms.colorTextures = new THREE.Uniform(new Array(nbSamplers[1]).fill(null));
         this.uniforms.colorOffsetScales = new THREE.Uniform(new Array(nbSamplers[1]).fill(identityOffsetScale));

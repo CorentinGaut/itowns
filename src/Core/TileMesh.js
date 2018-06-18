@@ -44,7 +44,6 @@ function TileMesh(geometry, params) {
     this.layerUpdateState = {};
 
     this.material.uuid = this.id;
-    this.material.updateUniforms();
 
     this._state = RendererConstant.FINAL;
 }
@@ -113,15 +112,6 @@ TileMesh.prototype.pushRenderState = function pushRenderState(state) {
     };
 };
 
-TileMesh.prototype.setTextureElevation = function setTextureElevation(elevation) {
-    if (this.material === null) {
-        return;
-    }
-    this.setBBoxZ(elevation.min, elevation.max);
-    this.material.getElevationLayer().setTexture(0, elevation.texture, elevation.pitch);
-    this.material.updateUniforms();
-};
-
 TileMesh.prototype.setBBoxZ = function setBBoxZ(min, max) {
     if (min == undefined && max == undefined) {
         return;
@@ -139,14 +129,15 @@ TileMesh.prototype.updateGeometricError = function updateGeometricError() {
     this.geometricError = this.boundingSphere.radius / SIZE_TEXTURE_TILE;
 };
 
-TileMesh.prototype.isColorLayerLoaded = function isColorLayerLoaded(layerId) {
-    const materialLayer = this.material.getLayer(layerId);
-    return materialLayer && materialLayer.level > EMPTY_TEXTURE_ZOOM;
+TileMesh.prototype.isLayerLoaded = function isLayerLoaded(layerId) {
+    const layer = this.material.getLayer(layerId);
+    return layer && layer.level > EMPTY_TEXTURE_ZOOM;
 };
 
+// TODO: deprecate this method in favor of tilemesh.isLayerLoaded(elevation.id)
 TileMesh.prototype.isElevationLayerLoaded = function isElevationLayerLoaded() {
-    const materialLayer = this.material.getElevationLayer();
-    return materialLayer && materialLayer.level > EMPTY_TEXTURE_ZOOM;
+    const layer = this.material.getElevationLayer();
+    return layer ? this.isLayerLoaded(layer.id) : false;
 };
 
 TileMesh.prototype.OBB = function OBB() {
@@ -158,10 +149,6 @@ TileMesh.prototype.removeLayer = function removeLayer(idLayer) {
         delete this.layerUpdateState[idLayer];
     }
     this.material.removeLayer(idLayer);
-};
-
-TileMesh.prototype.changeSequenceLayers = function changeSequenceLayers(sequence) {
-    this.material.setSequence(sequence);
 };
 
 TileMesh.prototype.getCoordsForLayer = function getCoordsForLayer(layer) {

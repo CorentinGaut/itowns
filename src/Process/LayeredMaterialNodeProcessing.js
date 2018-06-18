@@ -57,7 +57,9 @@ function initNodeElevationTextureFromParent(node, parent, layer) {
             elevation.max = max;
         }
 
-        node.setTextureElevation(elevation);
+        node.setBBoxZ(elevation.min, elevation.max);
+        node.material.getElevationLayer().setTexture(0, elevation.texture, elevation.pitch);
+        node.material.updateUniforms();
     }
 }
 
@@ -358,7 +360,7 @@ export function updateLayeredMaterialNodeElevation(context, layer, node) {
     };
 
     return context.scheduler.execute(command).then(
-        (terrain) => {
+        (elevation) => {
             const nodeLayer = node.material && node.material.getElevationLayer();
             if (!nodeLayer) {
                 return;
@@ -374,22 +376,24 @@ export function updateLayeredMaterialNodeElevation(context, layer, node) {
 
             node.layerUpdateState[layer.id].success();
 
-            if (terrain.texture && terrain.texture.flipY) {
+            if (elevation.texture && elevation.texture.flipY) {
                 // DataTexture default to false, so make sure other Texture types
                 // do the same (eg image texture)
                 // See UV construction for more details
-                terrain.texture.flipY = false;
-                terrain.texture.needsUpdate = true;
+                elevation.texture.flipY = false;
+                elevation.texture.needsUpdate = true;
             }
 
-            if (terrain.texture && terrain.texture.image.data && !checkNodeElevationTextureValidity(terrain.texture, layer.noDataValue)) {
+            if (elevation.texture && elevation.texture.image.data && !checkNodeElevationTextureValidity(elevation.texture, layer.noDataValue)) {
                 // Quick check to avoid using elevation texture with no data value
                 // If we have no data values, we use value from the parent tile
                 // We should later implement multi elevation layer to choose the one to use at each level
-                insertSignificantValuesFromParent(terrain.texture, node, node.parent, layer);
+                insertSignificantValuesFromParent(elevation.texture, node, node.parent, layer);
             }
 
-            node.setTextureElevation(terrain);
+            node.setBBoxZ(elevation.min, elevation.max);
+            node.material.getElevationLayer().setTexture(0, elevation.texture, elevation.pitch);
+            node.material.updateUniforms();
         },
         (err) => {
             if (err instanceof CancelledCommandException) {
