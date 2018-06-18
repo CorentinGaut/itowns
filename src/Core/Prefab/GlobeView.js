@@ -81,7 +81,7 @@ export function createGlobeLayer(id, options) {
         node.material.lightPosition = layer.lighting.position;
 
         if (layer.noTextureColor) {
-            node.material.noTextureColor.value.copy(layer.noTextureColor);
+            node.material.noTextureColor.value = layer.noTextureColor;
         }
 
         if (__DEBUG__) {

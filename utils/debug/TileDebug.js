@@ -39,7 +39,6 @@ export default function createTileDebugUI(datDebugTool, view, layer, debugInstan
 
         applyToNodeFirstMaterial(view, layer.object3d, layer.id, (material) => {
             material.showOutline = newValue;
-            material.updateUniforms();
         });
     });
 

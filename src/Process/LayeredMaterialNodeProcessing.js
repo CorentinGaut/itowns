@@ -58,7 +58,8 @@ function initNodeElevationTextureFromParent(node, parent, layer) {
         }
 
         node.setBBoxZ(elevation.min, elevation.max);
-        node.material.getElevationLayer().setTexture(0, elevation.texture, elevation.pitch);
+        const nodeLayer = node.material.getElevationLayer();
+        nodeLayer.setTexture(0, elevation.texture, elevation.pitch);
         node.material.updateUniforms();
     }
 }
@@ -137,8 +138,7 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
         return;
     }
 
-    const material = node.material;
-    let nodeLayer = material.getLayer(layer.id);
+    let nodeLayer = node.material.getLayer(layer.id);
 
     // Initialisation
     if (node.layerUpdateState[layer.id] === undefined) {
@@ -170,10 +170,10 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
                 id: layer.id,
             };
 
-            nodeLayer = material.addLayer(colorLayer);
+            nodeLayer = node.material.addLayer(colorLayer);
             const colorLayers = context.view.getLayers(l => l.type === 'color');
             const sequence = ImageryLayers.getColorLayersIdOrderedBySequence(colorLayers);
-            material.setSequence(sequence);
+            node.material.setSequence(sequence);
             initNodeImageryTexturesFromParent(node, node.parent, layer);
         }
 
@@ -201,7 +201,7 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
     if (nodeLayer) {
         nodeLayer.visible = layer.visible;
         nodeLayer.opacity = layer.opacity;
-        material.updateUniforms();
+        node.material.updateUniforms();
     }
 
     const ts = Date.now();
@@ -392,7 +392,7 @@ export function updateLayeredMaterialNodeElevation(context, layer, node) {
             }
 
             node.setBBoxZ(elevation.min, elevation.max);
-            node.material.getElevationLayer().setTexture(0, elevation.texture, elevation.pitch);
+            nodeLayer.setTexture(0, elevation.texture, elevation.pitch);
             node.material.updateUniforms();
         },
         (err) => {

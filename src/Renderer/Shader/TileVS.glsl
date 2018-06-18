@@ -10,8 +10,7 @@ attribute vec3      normal;
 
 uniform mat4        modelMatrix;
 
-varying vec2        vUv_WGS84;
-varying float       vUv_PM;
+varying vec3        vUv;
 varying vec3        vNormal;
 
 void main() {
@@ -22,7 +21,6 @@ void main() {
         #include <project_vertex>
         #include <logdepthbuf_vertex>
 
-        vUv_WGS84 = uv_wgs84;
-        vUv_PM = uv_pm;
+        vUv = vec3(uv_wgs84, (uv_pm > 0.) ? uv_pm : uv_wgs84.y); // set pm=wgs84 if pm=0 (not computed)
         vNormal = normalize ( mat3( modelMatrix[0].xyz, modelMatrix[1].xyz, modelMatrix[2].xyz ) * normal );
 }

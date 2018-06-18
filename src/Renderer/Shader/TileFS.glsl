@@ -34,16 +34,20 @@ uniform bool        selected;
 const   vec3        selectedColor = vec3(1.0, 0.3, 0.0);
 uniform bool        lightingEnabled;
 
-varying vec2        vUv_WGS84;
-varying float       vUv_PM;
+varying vec3        vUv; // WGS84.x/PM.x, WGS84.y, PM.y
 varying vec3        vNormal;
 
 
 #if defined(DEBUG)
-    uniform bool showOutline;
-    const float sLine = 0.008;
-    const vec3 pmColor = vec3( 1.0, 0.5, 0.0);
-    const vec3 wgs84Color = vec3( 1.0, 0.0, 0.0);
+uniform bool showOutline;
+uniform vec3 outlineColors[NUM_CRS];
+uniform float outlineWidth;
+
+float getOutlineAlpha(vec3 uv) {
+    vec4 p4 = vec4(uv.xy, 1. - uv.xy) / outlineWidth;
+    vec2 p2 = min(p4.xy, p4.zw);
+    return 1. - clamp(min(p2.x, p2.y), 0., 1.);
+}
 #endif
 
 #if defined(MATTE_ID_MODE) || defined(DEPTH_MODE)
@@ -64,12 +68,15 @@ vec4 applyLightColorToInvisibleEffect(vec4 color, float intensity) {
     return color;
 }
 
-vec3 uvWGS84;
-vec3 uvPM;
+vec3 uv_crs[NUM_CRS];
 
 vec4 getLayerColor(int i, sampler2D texture, vec4 offsetScale, Layer layer) {
     if ( !(i < colorTextureCount) ) return vec4(0);
-    vec3 uv = (layer.crs == CRS_PM) ? uvPM : uvWGS84;
+    vec3 uv;
+    #pragma unroll_loop
+    for ( int i = 0; i < NUM_CRS; i ++ ) {
+        if ( i == layer.crs ) uv = uv_crs[ i ];
+    }
     if (i != layer.textureOffset + int(uv.z)) return vec4(0);
     vec4 color = texture2D(texture, pitUV(uv.xy, offsetScale));
     if(color.a > 0.0) {
@@ -88,7 +95,6 @@ vec4 getLayerColor(int i, sampler2D texture, vec4 offsetScale, Layer layer) {
     }
     return color * layer.opacity;
 }
-
 
 void main() {
     #include <logdepthbuf_fragment>
@@ -111,21 +117,27 @@ void main() {
     gl_FragColor.a = opacity;
 
     // Reconstruct PM uv and PM subtexture id (see TileGeometry)
-    uvWGS84 = vec3(vUv_WGS84, 0.);
-    uvPM    = vec3(vUv_WGS84.x, fract(vUv_PM), floor(vUv_PM));
+    uv_crs[CRS_WGS84] = vec3(vUv.xy, 0.);
+    uv_crs[CRS_PM]    = vec3(vUv.x, fract(vUv.z), floor(vUv.z));
     
+    // Outlines
     #if defined(DEBUG)
+    vec4 outlineColor = vec4(0.);
     if (showOutline) {
-        if (uvWGS84.x < sLine || 1.0 - uvWGS84.x < sLine || uvWGS84.y < sLine || 1.0 - uvWGS84.y < sLine) {
-            gl_FragColor.rgb = wgs84Color;
-            return;
-        } else if (uvPM.x < sLine || 1.0 - uvPM.x < sLine || uvPM.y < sLine || 1.0 - uvPM.y < sLine) {
-            gl_FragColor.rgb = pmColor;
+        float alpha;
+        #pragma unroll_loop
+        for ( int i = 0; i < NUM_CRS; i ++ ) {
+             alpha = getOutlineAlpha(uv_crs[ i ]);
+             outlineColor = (alpha > outlineColor.a) ? vec4(outlineColors[ i ], alpha) : outlineColor;
+        }
+        if (outlineColor.a == 1.) {
+            gl_FragColor.rgb = outlineColor.rgb;
             return;
         }
     }
     #endif
 
+    // Layers
     vec4 layerColor;
     vec3 diffuseColor = noTextureColor;
     #pragma unroll_loop
@@ -134,6 +146,11 @@ void main() {
         // layerColor is alpha-premultiplied
         diffuseColor = layerColor.rgb + diffuseColor * (1.0 - layerColor.a);
     }
+
+    // Transparent outlines
+    #if defined(DEBUG)
+    diffuseColor = mix(diffuseColor, outlineColor.rgb, outlineColor.a);
+    #endif
 
     // Selected
     if(selected) {
@@ -149,7 +166,8 @@ void main() {
     float fogIntensity = 1.0/(exp(depth/distanceFog));
     gl_FragColor.rgb = mix(fogColor, diffuseColor.rgb, fogIntensity);
 
-    if(lightingEnabled) {   // Add lighting
+    // Add lighting
+    if(lightingEnabled) {
         float light = min(2. * dot(vNormal, lightPosition),1.);
         gl_FragColor.rgb *= light;
     }
