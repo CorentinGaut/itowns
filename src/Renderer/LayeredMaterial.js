@@ -30,7 +30,8 @@ export function unpack1K(color, factor) {
 }
 
 class LayeredMaterialLayer {
-    constructor(options = {}) {
+    constructor(options) {
+        this.id = options.id;
         this.textureOffset = 0; // will be updated in updateUniforms()
         this.wgs84 = (options.texturesCount !== undefined ? options.texturesCount : 1) == 1;
         this.effect = options.effect !== undefined ? options.effect : 0;
@@ -72,10 +73,20 @@ class LayeredMaterialLayer {
     }
 }
 
+function defineUniform(object, property, initValue) {
+    object.uniforms[property] = new THREE.Uniform(initValue);
+    Object.defineProperty(object, property, {
+        get: () => object.uniforms[property].value,
+        set: (value) => {
+            object.uniformsNeedUpdate |= object.uniforms[property].value != value;
+            object.uniforms[property].value = value;
+        },
+    });
+}
+
 class LayeredMaterial extends THREE.RawShaderMaterial {
     constructor(options = {}) {
         super(options);
-        this.defines = {};
 
         const maxTexturesUnits = Math.min(Capabilities.getMaxTextureUnitsCount(), 16) - 1;
         const nbSamplers = [1, maxTexturesUnits];
@@ -85,8 +96,7 @@ class LayeredMaterial extends THREE.RawShaderMaterial {
 
         if (__DEBUG__) {
             this.defines.DEBUG = 1;
-            this.showOutline = false;
-            this.uniforms.showOutline = new THREE.Uniform(this.showOutline);
+            defineUniform(this, 'showOutline', false);
         }
 
         if (options.useRgbaTextureElevation) {
@@ -99,55 +109,45 @@ class LayeredMaterial extends THREE.RawShaderMaterial {
             this.defines.DATA_TEXTURE_ELEVATION = 1;
         }
 
-        this.vertexShader = TileVS;
-        this.fragmentShader = ShaderUtils.unrollLoops(TileFS, this.defines);
-
-        // Color properties
-        this.noTextureColor = new THREE.Color(0.04, 0.23, 0.35);
-        this.layers = {};
-
-        // Lighting properties
-        this.lightPosition = new THREE.Vector3(-0.5, 0.0, 1.0);
-        this.lightingEnabled = false;
-
-        // Misc properties
-        this.distanceFog = 1000000000.0;
-        this.selected = false;
-        this.uuid = 0;
-
-        // Elevation uniforms
-        this.uniforms.elevationLayers = new THREE.Uniform(new Array(nbSamplers[0]).fill({}));
-        this.uniforms.elevationTextures = new THREE.Uniform(new Array(nbSamplers[0]).fill(null));
-        this.uniforms.elevationOffsetScales = new THREE.Uniform(new Array(nbSamplers[0]).fill(identityOffsetScale));
-        this.uniforms.elevationTextureCount = new THREE.Uniform(0);
-
-        // Color uniforms
-        this.uniforms.opacity = new THREE.Uniform(this.opacity);
-        this.uniforms.noTextureColor = new THREE.Uniform(this.noTextureColor);
-        this.uniforms.colorLayers = new THREE.Uniform(new Array(nbSamplers[1]).fill({}));
-        this.uniforms.colorTextures = new THREE.Uniform(new Array(nbSamplers[1]).fill(null));
-        this.uniforms.colorOffsetScales = new THREE.Uniform(new Array(nbSamplers[1]).fill(identityOffsetScale));
-        this.uniforms.colorTextureCount = new THREE.Uniform(0);
-
-        // Lighting uniforms
-        this.uniforms.lightingEnabled = new THREE.Uniform(this.lightingEnabled);
-        this.uniforms.lightPosition = new THREE.Uniform(this.lightPosition);
-
-        // Misc properties
-        this.uniforms.distanceFog = new THREE.Uniform(this.distanceFog);
-        this.uniforms.selected = new THREE.Uniform(this.selected);
-        this.uniforms.uuid = new THREE.Uniform(this.uuid);
-
         if (Capabilities.isLogDepthBufferSupported()) {
             this.defines.USE_LOGDEPTHBUF = 1;
             this.defines.USE_LOGDEPTHBUF_EXT = 1;
         }
 
-        // transitory setup with a single hard-coded elevation layer
-        const elevationLayerId = 'elevation';
-        this.elevationLayer = this.addLayer({ id: elevationLayerId });
-        this.elevationLayerIds = [elevationLayerId];
+        this.vertexShader = TileVS;
+        this.fragmentShader = ShaderUtils.unrollLoops(TileFS, this.defines);
+
+        // Color uniforms
+        defineUniform(this, 'noTextureColor', new THREE.Color(0.04, 0.23, 0.35));
+        defineUniform(this, 'opacity', this.opacity);
+
+        // Lighting uniforms
+        defineUniform(this, 'lightingEnabled', false);
+        defineUniform(this, 'lightPosition', new THREE.Vector3(-0.5, 0.0, 1.0));
+
+        // Misc properties
+        defineUniform(this, 'distanceFog', 1000000000.0);
+        defineUniform(this, 'selected', false);
+        defineUniform(this, 'uuid', 0);
+
+        // LayeredMaterialLayers
+        this.layers = {};
+        this.elevationLayerIds = [];
         this.colorLayerIds = [];
+
+        // layer uniforms, to be updated using updateUniforms()
+        this.uniforms.elevationLayers = new THREE.Uniform(new Array(nbSamplers[0]).fill({}));
+        this.uniforms.elevationTextures = new THREE.Uniform(new Array(nbSamplers[0]).fill(null));
+        this.uniforms.elevationOffsetScales = new THREE.Uniform(new Array(nbSamplers[0]).fill(identityOffsetScale));
+        this.uniforms.elevationTextureCount = new THREE.Uniform(0);
+        this.uniforms.colorLayers = new THREE.Uniform(new Array(nbSamplers[1]).fill({}));
+        this.uniforms.colorTextures = new THREE.Uniform(new Array(nbSamplers[1]).fill(null));
+        this.uniforms.colorOffsetScales = new THREE.Uniform(new Array(nbSamplers[1]).fill(identityOffsetScale));
+        this.uniforms.colorTextureCount = new THREE.Uniform(0);
+
+        // transitory setup with a single hard-coded elevation layer
+        this.elevationLayer = this.addLayer({ id: 'elevation' });
+        this.elevationLayerIds[0] = this.elevationLayer.id;
     }
 
     _updateUniforms(color) {
@@ -183,23 +183,8 @@ class LayeredMaterial extends THREE.RawShaderMaterial {
     }
 
     updateUniforms() {
-        // Color uniforms
-        this.uniforms.showOutline.value = this.showOutline;
-        this.uniforms.opacity.value = this.opacity;
-        this.uniforms.noTextureColor.value.copy(this.noTextureColor);
-
         this._updateUniforms(0); // elevation uniforms
         this._updateUniforms(1); // color uniforms
-
-        // Lighting uniforms
-        this.uniforms.lightingEnabled.value = this.lightingEnabled;
-        this.uniforms.lightPosition.value.copy(this.lightPosition);
-
-        // Misc uniforms
-        this.uniforms.distanceFog.value = this.distanceFog;
-        this.uniforms.selected.value = this.selected;
-        this.uniforms.uuid.value = this.uuid;
-
         this.uniformsNeedUpdate = true;
     }
 
@@ -223,6 +208,7 @@ class LayeredMaterial extends THREE.RawShaderMaterial {
     }
 
     addLayer(param) {
+        // check if (param.id in this.layers) ?
         const layer = new LayeredMaterialLayer(param);
         this.layers[param.id] = layer;
         return layer;
