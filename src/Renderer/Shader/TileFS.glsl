@@ -71,14 +71,17 @@ vec4 applyLightColorToInvisibleEffect(vec4 color, float intensity) {
 vec3 uv_crs[NUM_CRS];
 
 vec4 getLayerColor(int i, sampler2D texture, vec4 offsetScale, Layer layer) {
+    if (layer.crs != CRS_WGS84) return vec4(0);
     if ( !(i < colorTextureCount) ) return vec4(0);
     vec3 uv;
     #pragma unroll_loop
     for ( int i = 0; i < NUM_CRS; i ++ ) {
         if ( i == layer.crs ) uv = uv_crs[ i ];
     }
-    if (i != layer.textureOffset + int(uv.z)) return vec4(0);
-    vec4 color = texture2D(texture, pitUV(uv.xy, offsetScale));
+    uv.xy = pitUV(uv.xy, offsetScale);
+    vec2 dist = min(uv.xy, 1. - uv.xy);
+    if (dist.x < 0. || dist.y < 0.) return vec4(0);
+    vec4 color = texture2D(texture, uv.xy);
     if(color.a > 0.0) {
         if(layer.effect > 2.0) {
             color.rgb /= color.a;
@@ -90,9 +93,11 @@ vec4 getLayerColor(int i, sampler2D texture, vec4 offsetScale, Layer layer) {
             color.rgb *= color.a;
         }
     }
+    #if defined(DEBUG)
     if (showOutline && uv.x > offsetScale.z) {
         color *= offsetScale.z; // to darken according to downscaling
     }
+    #endif
     return color * layer.opacity;
 }
 

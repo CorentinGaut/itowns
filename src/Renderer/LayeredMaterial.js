@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import proj from 'glsl-proj4';
 import TileVS from './Shader/TileVS.glsl';
 import TileFS from './Shader/TileFS.glsl';
 import ShaderUtils from './Shader/ShaderUtils';
@@ -9,14 +10,20 @@ import project_pars_vertex from './Shader/Chunk/project_pars_vertex.glsl';
 import elevation_pars_vertex from './Shader/Chunk/elevation_pars_vertex.glsl';
 import elevation_vertex from './Shader/Chunk/elevation_vertex.glsl';
 import pitUV from './Shader/Chunk/pitUV.glsl';
+import geocent_t from './Shader/Chunk/geocent_t.glsl';
+import geocent_inverse from './Shader/Chunk/geocent_inverse.glsl';
+import geocent_forward from './Shader/Chunk/geocent_forward.glsl';
 
 THREE.ShaderChunk['itowns.precision_qualifier'] = precision_qualifier;
 THREE.ShaderChunk['itowns.project_pars_vertex'] = project_pars_vertex;
 THREE.ShaderChunk['itowns.elevation_pars_vertex'] = elevation_pars_vertex;
 THREE.ShaderChunk['itowns.elevation_vertex'] = elevation_vertex;
 THREE.ShaderChunk['itowns.pitUV'] = pitUV;
+THREE.ShaderChunk['proj4.geocent_t'] = geocent_t;
+THREE.ShaderChunk['proj4.geocent_inverse'] = geocent_inverse;
+THREE.ShaderChunk['proj4.geocent_forward'] = geocent_forward;
 
-var identityOffsetScale = new THREE.Vector4(0.0, 0.0, 1.0, 1.0);
+const identityOffsetScale = new THREE.Vector4(0.0, 0.0, 1.0, 1.0);
 
 // from three.js packDepthToRGBA
 const UnpackDownscale = 255 / 256; // 0..1 -> fraction (excluding 1)
@@ -148,10 +155,26 @@ class LayeredMaterial extends THREE.RawShaderMaterial {
         defineUniform(this, 'lightingEnabled', false);
         defineUniform(this, 'lightPosition', new THREE.Vector3(-0.5, 0.0, 1.0));
 
-        // Misc properties
+        // Misc uniforms
         defineUniform(this, 'distanceFog', 1000000000.0);
         defineUniform(this, 'selected', false);
         defineUniform(this, 'uuid', 0);
+
+        // proj4 uniforms
+        const p = proj('+proj=geocent +datum=WGS84 +units=m +no_defs');
+        const t = p.members('');
+        // remove the leading dot
+        Object.keys(t).forEach((key) => {
+            t[key.substr(1)] = t[key];
+            delete t[key];
+        });
+        defineUniform(this, 'geocent', {
+            p0: new THREE.Vector4(t.x0, t.y0, t.z0, t.k0),
+            gf: new THREE.Vector2(t.b * t.eprime * t.eprime, -t.a * t.e * t.e),
+            ab: new THREE.Vector2(t.a, t.b),
+            sqrt_one_e2: Math.sqrt(1 - t.e * t.e),
+            e2: 1 - (t.b * t.b) / (t.a * t.a),
+        });
 
         // LayeredMaterialLayers
         this.layers = {};
@@ -201,11 +224,13 @@ class LayeredMaterial extends THREE.RawShaderMaterial {
         let count = 0;
         for (const layerId of layerIds) {
             const layer = this.layers[layerId];
-            if (layer && layer.visible && layer.opacity > 0) {
+            if (layer && layer.visible && layer.opacity > 0 && layer.crs == 0) {
                 layer.textureOffset = count;
                 for (let i = 0, il = layer.textures.length; i < il; ++i) {
                     if (count < max) {
-                        offsetScales[count] = layer.offsetScales[i];
+                        const extent = layer.textures[i].coords.as('EPSG:4326');
+                        offsetScales[count].set(extent.east(), extent.north(), extent.west(), extent.south());
+                        // console.log(offsetScales[count]);
                         textures[count] = layer.textures[i];
                         layers[count] = layer;
                     }
