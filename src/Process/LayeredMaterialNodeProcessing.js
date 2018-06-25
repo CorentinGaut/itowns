@@ -11,7 +11,7 @@ const MAX_RETRY = 4;
 
 function initNodeImageryTexturesFromParent(node, parent, layer) {
     if (parent.material && parent.material.getColorLayerLevelById(layer.id) > EMPTY_TEXTURE_ZOOM) {
-        const coords = layer.getCoords(node);
+        const coords = layer.getCoords(node.extent);
         const offsetTextures = node.material.getLayerTextureOffset(layer.id);
 
         let textureIndex = offsetTextures;
@@ -44,7 +44,7 @@ function initNodeElevationTextureFromParent(node, parent, layer) {
     // multiple elevation layers (thus multiple calls to initNodeElevationTextureFromParent) but a given
     // node can only use 1 elevation texture
     if (parent.material && parent.material.getElevationLayerLevel() > node.material.getElevationLayerLevel()) {
-        const coords = layer.getCoords(node);
+        const coords = layer.getCoords(node.extent);
 
         const texture = parent.material.textures[l_ELEVATION][0];
         const pitch = coords[0].offsetToParent(parent.material.textures[l_ELEVATION][0].coords);
@@ -84,7 +84,7 @@ function getIndiceWithPitch(i, pitch, w) {
 
 function insertSignificantValuesFromParent(texture, node, parent, layer) {
     if (parent.material && parent.material.getElevationLayerLevel() > EMPTY_TEXTURE_ZOOM) {
-        const coords = layer.getCoords(node);
+        const coords = layer.getCoords(node.extent);
         const textureParent = parent.material.textures[l_ELEVATION][0];
         const pitch = coords[0].offsetToParent(parent.material.textures[l_ELEVATION][0].coords);
         const tData = texture.image.data;
@@ -169,10 +169,10 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
 
         if (material.indexOfColorLayer(layer.id) === -1) {
             const texturesCount =
-                layer.getCoords(node).length;
+                layer.getCoords(node.extent).length;
 
             const paramMaterial = {
-                tileMT: layer.options.tileMatrixSet || layer.getCoords(node)[0].crs(),
+                tileMT: layer.options.tileMatrixSet || layer.getCoords(node.extent)[0].crs(),
                 texturesCount,
                 visible: layer.visible,
                 opacity: layer.opacity,
@@ -240,7 +240,7 @@ export function updateLayeredMaterialNodeImagery(context, layer, node) {
 
     const failureParams = node.layerUpdateState[layer.id].failureParams;
     const currentLevel = node.material.getColorLayerLevelById(layer.id);
-    const nodeLevel = layer.getCoords(node)[0].zoom || node.level;
+    const nodeLevel = layer.getCoords(node.extent)[0].zoom || node.level;
     const targetLevel = chooseNextLevelToFetch(layer.updateStrategy.type, node, nodeLevel, currentLevel, layer, failureParams);
     if (targetLevel <= currentLevel) {
         return;
@@ -348,7 +348,7 @@ export function updateLayeredMaterialNodeElevation(context, layer, node) {
         }
     }
 
-    const c = layer.getCoords(node)[0];
+    const c = layer.getCoords(node.extent)[0];
     const zoom = c.zoom || node.level;
     const targetLevel = chooseNextLevelToFetch(layer.updateStrategy.type, node, zoom, currentElevation, layer);
 

@@ -202,8 +202,8 @@ TileMesh.prototype.changeSequenceLayers = function changeSequenceLayers(sequence
 };
 
 TileMesh.prototype.getCoordsForLayer = function getCoordsForLayer(layer) {
-    console.warn('tile.getCoordsForLayer(layer) is deprecated, use layer.getCoords(tile) instead.');
-    return layer.getCoords(this);
+    console.warn('tile.getCoordsForLayer(layer) is deprecated, use layer.getCoords(tile.extent) instead.');
+    return layer.getCoords(this.extent);
 };
 
 TileMesh.prototype.getZoomForLayer = function getZoomForLayer(layer) {

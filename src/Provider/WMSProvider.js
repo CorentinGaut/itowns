@@ -12,7 +12,7 @@ import URLBuilder from './URLBuilder';
 const supportedFormats = ['image/png', 'image/jpg', 'image/jpeg'];
 
 function tileTextureCount(tile, layer) {
-    return tile.extent.crs() == layer.projection ? 1 : layer.getCoords(tile).length;
+    return tile.extent.crs() == layer.projection ? 1 : layer.getCoords(tile.extent).length;
 }
 
 function preprocessDataLayer(layer) {
@@ -71,16 +71,16 @@ function preprocessDataLayer(layer) {
                   }&WIDTH=${layer.width
                   }&HEIGHT=${layer.width}`;
 
-    layer.getCoords = function getCoords(node) {
-        if (this.projection == node.extent.crs()) {
-            return [node.extent];
+    layer.getCoords = function getCoords(extent) {
+        if (this.projection == extent.crs()) {
+            return [extent];
         }
         if (this.projection != 'EPSG:3857') {
             throw new Error('unsupported projection wms for this viewer');
         }
         const tilematrixset = 'PM';
-        OGCWebServiceHelper.computeTileMatrixSetCoordinates(node, tilematrixset);
-        return node.wmtsCoords[tilematrixset];
+        OGCWebServiceHelper.computeTileMatrixSetCoordinates(extent, tilematrixset);
+        return extent.wmtsCoords[tilematrixset];
     };
 }
 
@@ -153,7 +153,7 @@ function getColorTextures(tile, layer, targetLevel) {
         return Promise.resolve();
     }
     const promises = [];
-    for (const coord of layer.getCoords(tile)) {
+    for (const coord of layer.getCoords(tile.extent)) {
         promises.push(getColorTexture(tile, layer, targetLevel, coord));
     }
 

@@ -141,7 +141,7 @@ function _preprocessLayer(view, layer, provider, parentLayer) {
         };
     }
 
-    layer.getCoords = layer.getCoords || (node => [node.extent]);
+    layer.getCoords = layer.getCoords || (extent => [extent]);
     layer.getZoom = layer.getZoom || (node => node.level);
 
     if (provider) {
