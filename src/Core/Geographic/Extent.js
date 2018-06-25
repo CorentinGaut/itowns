@@ -389,4 +389,77 @@ Extent.prototype.expandByPoint = function expandByPoint(coordinates) {
     }
 };
 
+const tileCoord = new Extent('WMTS:WGS84G', 0, 0, 0);
+
+Extent.prototype.computeTileMatrixSetCoordinates = function computeTileMatrixSetCoordinates(tileMatrixSet) {
+    // Are WMTS coordinates ready?
+    if (!this.wmtsCoords) {
+        this.wmtsCoords = {};
+    }
+
+    tileMatrixSet = tileMatrixSet || 'WGS84G';
+    if (!(tileMatrixSet in this.wmtsCoords)) {
+        if (this.wmtsCoords.WGS84G) {
+            const c = this.wmtsCoords.WGS84G[0];
+            tileCoord.zoom = c.zoom;
+            tileCoord.col = c.col;
+            tileCoord.row = c.row;
+        } else {
+            Projection.WGS84toWMTS(this, tileCoord);
+        }
+
+        this.wmtsCoords[tileMatrixSet] =
+            Projection.getCoordWMTS_WGS84(tileCoord, this, tileMatrixSet);
+    }
+};
+
+// The origin parameter is to be set to the correct value, bottom or top
+// (default being bottom) if the computation of the coordinates needs to be
+// inverted to match the same scheme as OSM, Google Maps or other system.
+// See link below for more information
+// https://alastaira.wordpress.com/2011/07/06/converting-tms-tile-coordinates-to-googlebingosm-tile-coordinates/
+Extent.prototype.computeTMSCoordinates = function computeTMSCoordinates(fullExtent, origin = 'bottom') {
+    if (this.crs() != fullExtent.crs()) {
+        throw new Error('CRS must match when computing TMS coordinates. (TMS is only supported when geometry has the same crs than TMS layer)');
+    }
+    const c = this.center();
+    const fullDimensions = fullExtent.dimensions();
+
+    // Each level has 2^n * 2^n tiles...
+    // ... so we count how many tiles of the same width as tile we can fit in the full extent
+    const tileCount = Math.round(fullDimensions.x / this.dimensions().x);
+    // ... 2^zoom = tilecount => zoom = log2(tilecount)
+    const zoom = Math.floor(Math.log2(tileCount));
+
+    // Now that we have computed zoom, we can deduce x and y (or row / column)
+    const x = (c.x() - fullExtent.west()) / fullDimensions.x;
+    let y;
+    if (origin == 'top') {
+        y = (fullExtent.north() - c.y()) / fullDimensions.y;
+    } else {
+        y = (c.y() - fullExtent.south()) / fullDimensions.y;
+    }
+
+    return [new Extent('TMS', zoom, Math.floor(y * tileCount), Math.floor(x * tileCount))];
+};
+
+Extent.prototype.WMTS_WGS84Parent = function WMTS_WGS84Parent(levelParent, pitch, target) {
+    target = target || new Extent(this.crs(), 0, 0, 0);
+    const diffLevel = this.zoom - levelParent;
+    const diff = Math.pow(2, diffLevel);
+    const invDiff = 1 / diff;
+
+    const r = (this.row - (this.row % diff)) * invDiff;
+    const c = (this.col - (this.col % diff)) * invDiff;
+
+    if (pitch) {
+        pitch.x = this.col * invDiff - c;
+        pitch.y = this.row * invDiff - r;
+        pitch.z = invDiff;
+        pitch.w = invDiff;
+    }
+
+    return target.set(levelParent, r, c);
+};
+
 export default Extent;

@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 import Extent from '../Core/Geographic/Extent';
-import OGCWebServiceHelper from './OGCWebServiceHelper';
+import { getColorTextureByUrl } from './OGCWebServiceHelper';
 import URLBuilder from './URLBuilder';
 
 const supportedFormats = ['image/png', 'image/jpg', 'image/jpeg'];
@@ -79,7 +79,7 @@ function preprocessDataLayer(layer) {
             throw new Error('unsupported projection wms for this viewer');
         }
         const tilematrixset = 'PM';
-        OGCWebServiceHelper.computeTileMatrixSetCoordinates(extent, tilematrixset);
+        extent.computeTileMatrixSetCoordinates(tilematrixset);
         return extent.wmtsCoords[tilematrixset];
     };
 }
@@ -119,7 +119,7 @@ function getColorTexture(tile, layer, targetLevel, tileCoords) {
     const pitch = tileCoords ? new THREE.Vector4(0, 0, 1, 1) : tile.extent.offsetToParent(extent);
     const result = { pitch };
 
-    return OGCWebServiceHelper.getColorTextureByUrl(urld, layer.networkOptions).then((texture) => {
+    return getColorTextureByUrl(urld, layer.networkOptions).then((texture) => {
         result.texture = texture;
         result.texture.extent = extent;
         if (layer.transparent) {

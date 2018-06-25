@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import OGCWebServiceHelper from './OGCWebServiceHelper';
+import { getColorTextureByUrl } from './OGCWebServiceHelper';
 import URLBuilder from './URLBuilder';
 import Extent from '../Core/Geographic/Extent';
 import { is4326 } from '../Core/Geographic/Coordinates';
@@ -28,10 +28,10 @@ function preprocessDataLayer(layer) {
         // Special globe case: use the P(seudo)M(ercator) coordinates
         if (is4326(extent.crs()) &&
                 (this.extent.crs() == 'EPSG:3857' || is4326(this.extent.crs()))) {
-            OGCWebServiceHelper.computeTileMatrixSetCoordinates(extent, 'PM');
+            extent.computeTileMatrixSetCoordinates('PM');
             return extent.wmtsCoords.PM;
         } else {
-            return OGCWebServiceHelper.computeTMSCoordinates(extent, this.extent, this.origin);
+            return extent.computeTMSCoordinates(this.extent, this.origin);
         }
     };
 }
@@ -43,12 +43,12 @@ function executeCommand(command) {
     const promises = [];
     for (const coordTMS of layer.getCoords(tile.extent)) {
         const coordTMSParent = (command.targetLevel < coordTMS.zoom) ?
-            OGCWebServiceHelper.WMTS_WGS84Parent(coordTMS, command.targetLevel) :
+            coordTMS.WMTS_WGS84Parent(command.targetLevel) :
             undefined;
 
         const urld = URLBuilder.xyz(coordTMSParent || coordTMS, layer);
 
-        promises.push(OGCWebServiceHelper.getColorTextureByUrl(urld, layer.networkOptions).then((texture) => {
+        promises.push(getColorTextureByUrl(urld, layer.networkOptions).then((texture) => {
             const result = {};
             result.texture = texture;
             result.texture.coords = coordTMSParent || coordTMS;
@@ -70,10 +70,10 @@ function tileTextureCount(tile, layer) {
 
 function tileInsideLimit(tile, layer, targetLevel) {
     // assume 1 TMS texture per tile (ie: tile geometry CRS is the same as layer's CRS)
-    let tmsCoord = layer.getCoords(tile.extent)[0];
+    const tmsCoord = layer.getCoords(tile.extent)[0];
 
     if (targetLevel < tmsCoord.zoom) {
-        tmsCoord = OGCWebServiceHelper.WMTS_WGS84Parent(tmsCoord, targetLevel);
+        tmsCoord.WMTS_WGS84Parent(targetLevel, undefined, tmsCoord);
     }
 
     return layer.options.zoom.min <= tmsCoord.zoom &&

@@ -1,7 +1,7 @@
 import flatbush from 'flatbush';
 import { Vector4 } from 'three';
 import Extent from '../Core/Geographic/Extent';
-import OGCWebServiceHelper from './OGCWebServiceHelper';
+import { getColorTextureByUrl, getXBilTextureByUrl } from './OGCWebServiceHelper';
 import Fetcher from './Fetcher';
 import { l_COLOR, l_ELEVATION } from '../Renderer/LayeredMaterialConstants';
 
@@ -67,8 +67,8 @@ function getTexture(tile, layer, targetLevel) {
 
 
     const fn = layer.format.indexOf('image/x-bil') === 0 ?
-        OGCWebServiceHelper.getXBilTextureByUrl :
-        OGCWebServiceHelper.getColorTextureByUrl;
+        getXBilTextureByUrl :
+        getColorTextureByUrl;
     return fn(buildUrl(layer, selection.image), layer.networkOptions).then((texture) => {
         // adjust pitch
         const result = {

@@ -5,7 +5,7 @@
  */
 
 import * as THREE from 'three';
-import OGCWebServiceHelper from './OGCWebServiceHelper';
+import { getColorTextureByUrl, getXBilTextureByUrl } from './OGCWebServiceHelper';
 import URLBuilder from './URLBuilder';
 import Extent from '../Core/Geographic/Extent';
 
@@ -59,7 +59,7 @@ function preprocessDataLayer(layer) {
     }
     layer.options.zoom = layer.options.zoom || { min: 2, max: 20 };
     layer.getCoords = function getCoords(extent) {
-        OGCWebServiceHelper.computeTileMatrixSetCoordinates(extent, this.options.tileMatrixSet);
+        extent.computeTileMatrixSetCoordinates(this.options.tileMatrixSet);
         return extent.wmtsCoords[this.options.tileMatrixSet];
     };
     layer.getZoom = function getZoom(node) {
@@ -76,15 +76,15 @@ function preprocessDataLayer(layer) {
  */
 function getXbilTexture(tile, layer, targetZoom) {
     const pitch = new THREE.Vector4(0.0, 0.0, 1.0, 1.0);
-    let coordWMTS = layer.getCoords(tile.extent)[0];
+    const coordWMTS = layer.getCoords(tile.extent)[0];
 
     if (targetZoom && targetZoom !== coordWMTS.zoom) {
-        coordWMTS = OGCWebServiceHelper.WMTS_WGS84Parent(coordWMTS, targetZoom, pitch);
+        coordWMTS.WMTS_WGS84Parent(targetZoom, pitch, coordWMTS);
     }
 
     const urld = URLBuilder.xyz(coordWMTS, layer);
 
-    return OGCWebServiceHelper.getXBilTextureByUrl(urld, layer.networkOptions).then((texture) => {
+    return getXBilTextureByUrl(urld, layer.networkOptions).then((texture) => {
         texture.coords = coordWMTS;
         return {
             texture,
@@ -106,11 +106,11 @@ function getXbilTexture(tile, layer, targetZoom) {
 function getColorTexture(coordWMTS, layer, targetZoom) {
     const pitch = new THREE.Vector4(0.0, 0.0, 1.0, 1.0);
     if (targetZoom && targetZoom !== coordWMTS.zoom) {
-        coordWMTS = OGCWebServiceHelper.WMTS_WGS84Parent(coordWMTS, targetZoom, pitch);
+        coordWMTS.WMTS_WGS84Parent(targetZoom, pitch, coordWMTS);
     }
 
     const urld = URLBuilder.xyz(coordWMTS, layer);
-    return OGCWebServiceHelper.getColorTextureByUrl(urld, layer.networkOptions).then((texture) => {
+    return getColorTextureByUrl(urld, layer.networkOptions).then((texture) => {
         const result = {};
         result.texture = texture;
         result.texture.coords = coordWMTS;
@@ -130,9 +130,8 @@ function executeCommand(command) {
 }
 
 function tileTextureCount(tile, layer) {
-    const extent = tile.extent;
-    OGCWebServiceHelper.computeTileMatrixSetCoordinates(extent, layer.options.tileMatrixSet);
-    return layer.getCoords(extent).length;
+    tile.extent.computeTileMatrixSetCoordinates(layer.options.tileMatrixSet);
+    return layer.getCoords(tile.extent).length;
 }
 
 function tileInsideLimit(tile, layer, targetLevel) {
@@ -143,7 +142,7 @@ function tileInsideLimit(tile, layer, targetLevel) {
         let c = coord;
         // override
         if (targetLevel < c.zoom) {
-            OGCWebServiceHelper.WMTS_WGS84Parent(coord, targetLevel, undefined, coordTile);
+            coord.WMTS_WGS84Parent(targetLevel, undefined, coordTile);
             c = coordTile;
         }
         if (c.zoom < layer.options.zoom.min || c.zoom > layer.options.zoom.max) {
