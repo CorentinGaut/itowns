@@ -28,6 +28,7 @@
             "src/Parser/GeoJsonParser.js",
             "src/Parser/GpxParser.js",
             "src/Parser/VectorTileParser.js",
+            "src/Parser/OrientationParser.js",
 
             "src/Provider/URLBuilder.js",
             "src/Provider/VectorTileHelper.js",
