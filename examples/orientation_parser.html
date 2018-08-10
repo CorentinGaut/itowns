@@ -1,0 +1,119 @@
+<html>
+    <head>
+        <title>Itowns - Orientation parser example in globe</title>
+
+        <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+        <link rel="stylesheet" type="text/css" href="css/loading_screen.css">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="js/GUI/dat.gui/dat.gui.min.js"></script>
+    </head>
+    <body>
+        <div id="viewerDiv"></div>
+        <script src="js/GUI/GuiTools.js"></script>
+        <script src="../dist/itowns.js"></script>
+        <script src="js/loading_screen.js"></script>
+        <script src="js/ThreeLoader.js"></script>
+        <script src="../dist/debug.js"></script>
+        <script type="text/javascript">
+            
+            // Define initial camera position
+            // Coordinate can be found on https://www.geoportail.gouv.fr/carte
+            // setting is "coordonnée geographiques en degres decimaux"
+            var positionOnGlobe = { longitude: 2.33481381638492, latitude: 48.850602961052147, altitude: 100 };
+
+            // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
+            var viewerDiv = document.getElementById('viewerDiv');
+
+            // Instanciate iTowns GlobeView
+            var globeView = new itowns.GlobeView(viewerDiv, positionOnGlobe, {
+                handleCollision: false,
+            });
+           globeView.controls.minDistance = 30;
+
+            var menuGlobe = new GuiTools('menuDiv', globeView);
+
+            setupLoadingScreen(viewerDiv, globeView);
+
+            function addLayerCb(layer) {
+                return globeView.addLayer(layer);
+            }
+
+            // Add one imagery layer to the scene
+            itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then(addLayerCb);
+
+            // Add elevation layer.
+            var promises = [];
+            promises.push(itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json').then(addLayerCb));
+            
+            // Input data : a geoJson file, with point features, with orientation specific properties
+            var panoramics = 'https://raw.githubusercontent.com/iTowns/iTowns2-sample-data/master/immersive/exampleParis1/panoramicsMetaDataParis.geojson';
+            var layer = {
+                crsOut: globeView.referenceCrs,
+            };
+            // Input data are given in Lambert93 projection
+            itowns.proj4.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+
+            // Add a promise to load oriented point datas
+            promises.push(
+                // first parse the JSON format
+                itowns.Fetcher.json(panoramics, {})
+                // then get geographic informations (coordinates) using GeoJson parser
+                .then(orientations => itowns.GeoJsonParser.parse(orientations, layer))
+                // then get orientation informations 
+                .then(collection => itowns.OrientationParser.parse(collection.features, layer))
+            );        
+            
+            // load collada model of a renault trafic
+            promises.push(ThreeLoader.load('Collada',
+             'https://raw.githubusercontent.com/iTowns/iTowns2-sample-data/master/models/collada/renault_trafic_no_texture.dae')
+             .then(collada => {
+                // prepare collada model base scale and rotation. in this example, we want the car to go straigth.
+                var colladaModel = collada.scene;
+                colladaModel.scale.set(0.5, 0.5, 0.5);
+                colladaModel.rotateZ(-Math.PI / 2 );
+                // put the model in a group, to allow user to do other transformation (rotation..)
+                var group = new itowns.THREE.Group();
+                group.add(colladaModel);
+                return group; 
+             }));
+
+            // wait for all layer to be loaded, we need for elevation layer
+            globeView.addEventListener(itowns.GLOBE_VIEW_EVENTS.GLOBE_INITIALIZED, function init() {
+                
+                // wait for all the promises
+                Promise.all(promises).then(res => loadFeatures(res[1], res[2]));
+            })
+            
+            // place a 3d model oriented for each feature
+            function loadFeatures(features, colladaModel) {
+
+                for (const feature of features) {
+                    
+                    // clone the collada model
+                    var model = colladaModel.clone();
+                    
+                    // get point coordinate
+                    var coord = feature.vertices[0]; 
+                    
+                    // change the coordinate to have the object at the altitude of the ground
+                    result = itowns.DEMUtils.getElevationValueAt(globeView.wgs84TileLayer, coord, 1, undefined);
+                    coord = coord.as('EPSG:4326');
+                    coord.setAltitude(result.z);
+        
+                    // set model position
+                    model.position.copy(coord.as(globeView.referenceCrs).xyz());
+                    
+                    // set model orientation
+                    model.quaternion.copy(feature.quaternion);
+                  
+                    // update matrix world and add the model
+                    model.updateMatrixWorld();
+                    globeView.scene.add(model);
+                }
+               globeView.notifyChange(undefined);
+            }
+        </script>
+    </body>
+</html>
