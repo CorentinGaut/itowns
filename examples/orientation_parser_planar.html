@@ -19,11 +19,14 @@
             var view;
             var meshes;
 
-            var extent = new itowns.Extent(
-                'EPSG:3857',
-                -20037508.342789, 20037508.342789,
-                -20037508.342789, 20037508.342789);
+            // Input data are given in Lambert93 projection
+            itowns.proj4.defs('EPSG:2154',
+                '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
 
+            var extent = new itowns.Extent(
+                'EPSG:2154',
+                651100, 651200,
+                6861300, 6861400);
             // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
             viewerDiv = document.getElementById('viewerDiv');
 
@@ -38,7 +41,7 @@
 
              itowns.Fetcher.json('./layers/JSONLayers/OPENSM.json').then(addLayerCb);
              view.camera.camera3D.rotateZ(-Math.PI / 2);
-             view.camera.camera3D.position.set(259900, 6249500, 200);
+             view.camera.camera3D.position.set(651150, 6861350, 200);
 
             // eslint-disable-next-line no-new
             new itowns.PlanarControls(view, {
@@ -52,16 +55,12 @@
                 // Don't zoom too much on smart zoom
                smartZoomHeightMax: 100000,
             });
-            
+
             // Input data : a geoJson file, with point features, with orientation specific properties
             var panoramics = 'https://raw.githubusercontent.com/iTowns/iTowns2-sample-data/master/immersive/exampleParis1/panoramicsMetaDataParis.geojson';
             var layer = {
                 crsOut: view.referenceCrs,
             };
-            // Input data are given in Lambert93 projection
-            itowns.proj4.defs('EPSG:2154',
-                '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
-            
             // Add a promise to load oriented point datas
             var promises = [];
             promises.push(
@@ -69,10 +68,10 @@
                 itowns.Fetcher.json(panoramics, {})
                 // then get geographic informations (coordinates) using GeoJson parser
                 .then(orientations => itowns.GeoJsonParser.parse(orientations, layer))
-                // then get orientation informations 
+                // then get orientation informations
                 .then(collection => itowns.OrientationParser.parse(collection.features, layer))
-            );        
-            
+            );
+
             // load collada model of a renault trafic
             promises.push(ThreeLoader.load('Collada',
              'https://raw.githubusercontent.com/iTowns/iTowns2-sample-data/master/models/collada/renault_trafic_no_texture.dae')
@@ -84,24 +83,25 @@
                 // put the model in a group, to allow user to do other transformation (rotation..)
                 var group = new itowns.THREE.Group();
                 group.add(colladaModel);
-                return group; 
+                return group;
              }));
 
             // wait for all the promises
             Promise.all(promises).then(res => loadFeatures(res[0], res[1]));
-            
+
             // place a 3d model oriented for each feature
             function loadFeatures(features, colladaModel) {
-   
-                for (const feature of features) {                  
-                
+
+                for (const feature of features) {
+
                     // clone the collada model
                     var model = colladaModel.clone();
-                          
+
                     // set model position to the ground
                     feature.position.z = 0;
                     model.position.copy(feature.position);
-                    
+
+
                     // set model orientation
                     model.quaternion.copy(feature.quaternion);
 
