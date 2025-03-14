@@ -17,26 +17,30 @@
         <script src="js/3dTilesHelper.js"></script>
         <script type="text/javascript">
             // Define crs projection that we will use (taken from https://epsg.io/3946, Proj4js section)
-            itowns.proj4.defs('EPSG:3946', '+proj=lcc +lat_1=45.25 +lat_2=46.75 +lat_0=46 +lon_0=3 +x_0=1700000 +y_0=5200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+            itowns.proj4.defs(
+    'EPSG:2154',
+    '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
+);
 
             // Define geographic extent: CRS, min/max X, min/max Y
-            var extent = new itowns.Extent( 'EPSG:3946',
-                1837816.94334, 1847692.32501,
-                5170036.4587, 5178412.82698);
+            var extent = new itowns.Extent( 'EPSG:2154',
+                904000, 905000,
+                6245000, 6246000);
 
             // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
             var viewerDiv = document.getElementById('viewerDiv');
 
             // Instanciate PlanarView*
-            var cameraCoord = new itowns.Coordinates('EPSG:3946', 1841980,
-                5175682, 3000)
+            var cameraCoord = new itowns.Coordinates('EPSG:2154', 904500,
+                6245500, 3000);
             var view = new itowns.PlanarView(viewerDiv, extent, { placement: {
                 coord: cameraCoord, heading: 30, range: 4000, tilt: 30 } });
 
             setupLoadingScreen(viewerDiv, view);
 
+/*
             // Add a WMS imagery source
-            var wmsImagerySource = new itowns.WMSSource({
+            var wmsImagerySource = new itowns.FileSource({
                 extent: extent,
                 name: 'ortho_latest',
                 url: 'https://imagerie.data.grandlyon.com/wms/grandlyon',
@@ -46,7 +50,7 @@
             });
 
             // Add a WMS imagery layer
-            var wmsImageryLayer = new itowns.ColorLayer('wms_imagery', {
+            var wmsImageryLayer = new itowns.ColorLayer('imagery', {
                 updateStrategy: {
                     type: itowns.STRATEGY_DICHOTOMY,
                     options: {},
@@ -57,7 +61,7 @@
             view.addLayer(wmsImageryLayer);
 
             // Add a WMS elevation source
-            var wmsElevationSource = new itowns.WMSSource({
+            var wmsElevationSource = new itowns.FileSource({
                 extent: extent,
                 url: 'https://imagerie.data.grandlyon.com/wms/grandlyon',
                 name: 'MNT2018_Altitude_2m',
@@ -67,7 +71,7 @@
             });
 
             // Add a WMS elevation layer
-            var wmsElevationLayer = new itowns.ElevationLayer('wms_elevation', {
+            var wmsElevationLayer = new itowns.ElevationLayer('elevation', {
                 useColorTextureElevation: true,
                 colorTextureElevationMinZ: 144,
                 colorTextureElevationMaxZ: 622,
@@ -75,21 +79,20 @@
             });
 
             view.addLayer(wmsElevationLayer);
-
             // Add 3D Tiles layer
             // This 3D Tiles tileset uses the draco compression that is an
             // extension of gltf. We need to enable it.
             itowns.enableDracoLoader('./libs/draco/');
 
+*/
             var $3dTilesLayer = new itowns.C3DTilesLayer(
                 '3d-tiles-layer-building', {
                     name: 'Lyon-2015-building',
                     source: new itowns.C3DTilesSource({
-                        url: 'https://raw.githubusercontent.com/iTowns/iTowns2-sample-data/master/' +
-                            '3DTiles/lyon_1_3946_textured_draco/tileset.json',
+                        url: 'geojson_tilesets/tileset.json',
                     }),
                 }, view);
-
+                
             // Lights
             var dirLight = new itowns.THREE.DirectionalLight(0xffffff, 1);
             dirLight.position.set(-0.9, 0.3, 1);

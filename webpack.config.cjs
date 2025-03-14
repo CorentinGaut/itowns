@@ -1,5 +1,5 @@
 const path = require('path');
-const ESLintPlugin = require('eslint-webpack-plugin');
+// const ESLintPlugin = require('eslint-webpack-plugin');
 
 const mode = process.env.NODE_ENV;
 const noInline = process.env.noInline;
@@ -84,11 +84,12 @@ module.exports = () => {
             ],
         },
         plugins: [
-            new ESLintPlugin({
-                files: include,
-            }),
+           // new ESLintPlugin({
+           //     files: include,
+           // }),
         ],
         devServer: {
+            server: 'https',
             devMiddleware: {
                 publicPath: '/dist/',
             },

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Point Cloud on globe</title>
+
+        <style type="text/css">
+            #info {
+                color: #7ad7ff;
+                font-family: 'Open Sans', sans-serif;
+                position: absolute;
+                top: 0;
+                left: 0;
+                padding: 0.3rem;
+                background-color: #404040;
+                z-index: 1;
+            }
+
+            @media (max-width: 600px) {
+                #info,
+                .dg {
+                    display: none;
+                }
+            }
+        </style>
+
+        <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+        <link rel="stylesheet" type="text/css" href="css/LoadingScreen.css">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <div id="viewerDiv"></div>
+        <div id="info"></div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
+        <script src="../dist/itowns.js"></script>
+        <script src="../dist/potree.js"></script>
+        <script src="js/GUI/LoadingScreen.js"></script>
+        <script src="../dist/debug.js"></script>
+        <script type="text/javascript">
+var datGui = new dat.GUI();
+
+Potree.pointBudget = 10000*1000;
+const viewerDiv = document.getElementById("viewerDiv");
+
+const placement = {
+	coord: new itowns.Coordinates('EPSG:4326', 0, 0, 0),
+	range: 5000000,
+	tilt: 29.48,
+	heading: -25.11
+}
+const view = new itowns.GlobeView(viewerDiv, placement);
+const camera = view.camera.camera3D;
+
+itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then(function _(config) {
+	config.source = new itowns.WMTSSource(config.source);
+	var layer = new itowns.ColorLayer('Ortho', config);
+	view.addLayer(layer);
+});
+
+// instance points THREE.Group to add cloud
+const points = new THREE.Group();
+view.scene.add(points);
+let pointclouds = [];
+
+// Load pivot file, create by points Tools (assuming the `outputFolder` set in the configuration file is `./Out/`).
+itowns.Fetcher.json('./Out/metadata/pivotTHREE.json').then((pivot) => {
+	const loader = new THREE.ObjectLoader();
+	return loader.parse(pivot);
+}).then((pivotTHREE) => {
+	// Load ept cache with 
+	Potree.loadPointCloud('./Out/EPT_4978/ept.json', "pointcloud", function(e) {
+		const pointcloud = e.pointcloud;
+
+		// Place view
+		const pivot = new itowns.Coordinates('EPSG:4978', 0, 0, 0)
+		pivot.setFromVector3(pivotTHREE.position);
+		view.controls.lookAtCoordinate({ coord: pivot, range: 5000 }, false);
+
+		// transform points clouds with the pivot three
+		// To place cloud on Globe
+		pointclouds.push(pointcloud);
+		pointcloud.position.copy(pivotTHREE.position);
+		pointcloud.quaternion.copy(pivotTHREE.quaternion);
+
+		pointcloud.material = new itowns.PointsMaterial();
+		pointcloud.material.clipBoxes = [];
+		pointcloud.material.mode = 0;
+		pointcloud.material.intensityRange = new THREE.Vector3(0, 4096);
+		pointcloud.material.uniforms.octreeSize = { value: 0 };
+		pointcloud.material.size = 3;
+	});
+
+});
+
+view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, (a) => {
+	if (points) {
+		const renderer = view.mainLoop.gfxEngine.renderer;
+		const octree = Potree.updatePointClouds(pointclouds, camera, renderer);
+
+		points.children = [];
+
+		if (octree.visibleNodes.length) {
+			const sceneNodes = octree.visibleNodes.map(a => a.sceneNode)
+			for (var i = sceneNodes.length - 1; i >= 0; i--) {
+				const sceneNode = sceneNodes[i]
+				sceneNode.geometry.attributes.classification.normalized = true;
+				const rgba = sceneNode.geometry.getAttribute('rgba');
+				if (rgba) {
+					sceneNode.geometry.setAttribute('color', rgba);
+					sceneNode.geometry.deleteAttribute('rbga');
+				}
+				points.add(sceneNode);
+			}
+		}
+		view.notifyChange(camera, true);
+	}
+});
+        </script>
+    </body>
+</html>
+

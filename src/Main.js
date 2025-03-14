@@ -21,8 +21,8 @@ export { updateLayeredMaterialNodeImagery, updateLayeredMaterialNodeElevation } 
 export { default as OrientedImageCamera } from 'Renderer/OrientedImageCamera';
 export { default as PointsMaterial, PNTS_MODE, PNTS_SHAPE, PNTS_SIZE_MODE, ClassificationScheme } from 'Renderer/PointsMaterial';
 export { default as GlobeControls } from 'Controls/GlobeControls';
-export { default as FlyControls } from 'Controls/FlyControls';
-export { default as FirstPersonControls } from 'Controls/FirstPersonControls';
+// export { default as FlyControls } from 'Controls/FlyControls';
+// export { default as FirstPersonControls } from 'Controls/FirstPersonControls';
 export { default as StreetControls } from 'Controls/StreetControls';
 export { default as PlanarControls } from 'Controls/PlanarControls';
 export { CONTROL_EVENTS } from 'Controls/GlobeControls';
