@@ -14,7 +14,7 @@
         <script type="importmap">
             {
                 "imports": {
-                    "three": "../build/three.module.js",
+                    "three": "https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.module.js",
                     "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/"
                 }
             }
@@ -25,17 +25,30 @@
 
         <script type="module">
 
-            // import * as WebXR from 'three/addons/';
+            // import * as THREE from 'three';
            import { XRButton } from 'three/addons/webxr/XRButton.js';
-        //    import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
-        //    import { XRControllerModelFactory } from 'XRControllerModelFactory/XRControllerModelFactory.js';
+           import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+           import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
+
+
+
 	    itowns.proj4.defs("EPSG:2154","+proj=lcc +lat_0=46.5 +lon_0=3 +lat_1=49 +lat_2=44 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs");
 
-            // ---------- SETUP THE VR VIEW : ----------
+        // ---------- Controller params ---------
+        let hand1, hand2;
+        let controller1, controller2;
+        let controllerGrip1, controllerGrip2;
+
+        const handModels = {
+            left: null,
+            right: null
+        };
+
+        // ---------- SETUP THE VR VIEW : ----------
 
 	    var altitude = 100;
 	    var longitude = 2.5870426, latitude = 48.8409128; // mlv
-//	    var longitude = 2.4223264, latitude = 48.8447549; // smd
+	    // var longitude = 2.4223264, latitude = 48.8447549; // smd
 //	    var longitude = 2.7922434, latitude = 50.4577818; // loos
 //	    var longitude = 2.4676636, latitude = 48.8007534; // creteil
 //	    var longitude = 3.855731 , latitude = 43.959178; // st hippo
@@ -180,13 +193,88 @@
 
             // ---------- Set coontroller ----------
 
+            // add model to hand
+			controller1 = view.renderer.xr.getController( 0 );
+			view.scene.add( controller1 );
 
-            // const controllerModelFactory = new XRControllerModelFactory();
-    		// let controllerGrip = view.renderer.xr.getControllerGrip( 0 );
-			// controllerGrip.add( controllerModelFactory.createControllerModel( controllerGrip ) );
-			// view.scene.add( controllerGrip );
+			controller2 = view.renderer.xr.getController( 1 );
+			view.scene.add( controller2 );
 
-				
+			const controllerModelFactory = new XRControllerModelFactory();
+            const handModelFactory = new XRHandModelFactory();
+
+			// Hand 1
+			controllerGrip1 = view.renderer.xr.getControllerGrip( 0 );
+			controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
+			view.scene.add( controllerGrip1 );
+
+			hand1 = view.renderer.xr.getHand( 0 );
+            hand1.userData.currentHandModel = 0;
+			view.scene.add( hand1 );
+
+            handModels.left = [
+					handModelFactory.createHandModel( hand1, 'boxes' ),
+					handModelFactory.createHandModel( hand1, 'spheres' ),
+					handModelFactory.createHandModel( hand1, 'mesh' )
+				];
+
+            for ( let i = 0; i < 3; i ++ ) {
+
+                const model = handModels.left[ i ];
+                model.visible = i == 0;
+                hand1.add( model );
+
+            }
+
+            hand1.addEventListener( 'pinchend', function () {
+
+                handModels.left[ this.userData.currentHandModel ].visible = false;
+                this.userData.currentHandModel = ( this.userData.currentHandModel + 1 ) % 3;
+                handModels.left[ this.userData.currentHandModel ].visible = true;
+
+            } );
+
+            // Hand 2
+            controllerGrip2 = view.renderer.xr.getControllerGrip( 1 );
+            controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
+            view.scene.add( controllerGrip2 );
+
+            hand2 = view.renderer.xr.getHand( 1 );
+            hand2.userData.currentHandModel = 0;
+            view.scene.add( hand2 );
+
+            handModels.right = [
+					handModelFactory.createHandModel( hand2, 'boxes' ),
+					handModelFactory.createHandModel( hand2, 'spheres' ),
+					handModelFactory.createHandModel( hand2, 'mesh' )
+				];
+
+            for ( let i = 0; i < 3; i ++ ) {
+
+                const model = handModels.right[ i ];
+                model.visible = i == 0;
+                hand2.add( model );
+
+            }
+
+            hand2.addEventListener( 'pinchend', function () {
+
+                handModels.right[ this.userData.currentHandModel ].visible = false;
+                this.userData.currentHandModel = ( this.userData.currentHandModel + 1 ) % 3;
+                handModels.right[ this.userData.currentHandModel ].visible = true;
+
+            } );
+
+
+            // Input de la main
+            // hand1.addEventListener( 'pinchend', function () {
+
+			// 		handModels.left[ this.userData.currentHandModel ].visible = false;
+			// 		this.userData.currentHandModel = ( this.userData.currentHandModel + 1 ) % 3;
+			// 		handModels.left[ this.userData.currentHandModel ].visible = true;
+
+			// 	} );
+
         </script>
     </body>
 </html>
