@@ -48,7 +48,7 @@
 
 	    var altitude = 100;
 	    var longitude = 2.5870426, latitude = 48.8409128; // mlv
-	    // var longitude = 2.4223264, latitude = 48.8447549; // smd
+//	    var longitude = 2.4223264, latitude = 48.8447549; // smd
 //	    var longitude = 2.7922434, latitude = 50.4577818; // loos
 //	    var longitude = 2.4676636, latitude = 48.8007534; // creteil
 //	    var longitude = 3.855731 , latitude = 43.959178; // st hippo
@@ -212,27 +212,8 @@
             hand1.userData.currentHandModel = 0;
 			view.scene.add( hand1 );
 
-            handModels.left = [
-					handModelFactory.createHandModel( hand1, 'boxes' ),
-					handModelFactory.createHandModel( hand1, 'spheres' ),
-					handModelFactory.createHandModel( hand1, 'mesh' )
-				];
-
-            for ( let i = 0; i < 3; i ++ ) {
-
-                const model = handModels.left[ i ];
-                model.visible = i == 0;
-                hand1.add( model );
-
-            }
-
-            hand1.addEventListener( 'pinchend', function () {
-
-                handModels.left[ this.userData.currentHandModel ].visible = false;
-                this.userData.currentHandModel = ( this.userData.currentHandModel + 1 ) % 3;
-                handModels.left[ this.userData.currentHandModel ].visible = true;
-
-            } );
+            const model1 = handModelFactory.createHandModel( hand1, 'mesh' );
+            hand1.add(model1);
 
             // Hand 2
             controllerGrip2 = view.renderer.xr.getControllerGrip( 1 );
@@ -243,27 +224,8 @@
             hand2.userData.currentHandModel = 0;
             view.scene.add( hand2 );
 
-            handModels.right = [
-					handModelFactory.createHandModel( hand2, 'boxes' ),
-					handModelFactory.createHandModel( hand2, 'spheres' ),
-					handModelFactory.createHandModel( hand2, 'mesh' )
-				];
-
-            for ( let i = 0; i < 3; i ++ ) {
-
-                const model = handModels.right[ i ];
-                model.visible = i == 0;
-                hand2.add( model );
-
-            }
-
-            hand2.addEventListener( 'pinchend', function () {
-
-                handModels.right[ this.userData.currentHandModel ].visible = false;
-                this.userData.currentHandModel = ( this.userData.currentHandModel + 1 ) % 3;
-                handModels.right[ this.userData.currentHandModel ].visible = true;
-
-            } );
+            const model2 = handModelFactory.createHandModel( hand2, 'mesh' );
+            hand2.add(model2);
 
 
             // Input de la main
