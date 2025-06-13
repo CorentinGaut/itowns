@@ -66,7 +66,9 @@
 
             // Create a GlobeView
             const view = new itowns.GlobeView(viewerDiv, placement, {
-                webXR: { scale: 0.05 },
+                webXR: { 
+                    controllers: true,
+                    scale: 0.5 },
             });
 	window.view = view;
             
@@ -149,6 +151,9 @@
                     }
                 }
                 meshes = meshes.filter(function filter(m) { return m.scale.z < 1; });
+                // console.log(hand1);
+                // console.log(view.camera3D.position);
+
             };
 
             view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, scaler);
@@ -226,6 +231,16 @@
 
             const model2 = handModelFactory.createHandModel( hand2, 'mesh' );
             hand2.add(model2);
+
+
+            function onSelect() {
+
+					console.log('select');
+
+				}
+
+            controller1.addEventListener( 'select', onSelect );
+				// scene.add( controller );
 
 
             // Input de la main
