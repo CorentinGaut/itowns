@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { XRButton } from 'three/addons/webxr/XRButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
+
 import OrientationUtils from 'Utils/OrientationUtils.js';
 
 async function shutdownXR(session) {
@@ -12,6 +14,7 @@ async function shutdownXR(session) {
 function initializeController(view, controllerModelFactory, id) {
 	const xr = view.renderer.xr;
 	const controller = xr.getController( id );
+	controller.name = 'hand'+id;
 	//controller.addEventListener( 'selectstart', onSelectStart );
 	//controller.addEventListener( 'squeezestart', onSqueezeStart );
 	//controller.addEventListener( 'selectend', onSelectEnd );	
@@ -29,6 +32,7 @@ function initializeController(view, controllerModelFactory, id) {
 	});
 	const controllerGrip = xr.getControllerGrip( id );
 	controllerGrip.add( controllerModelFactory.createControllerModel( controllerGrip ) );
+	controllerGrip.name = 'grip'+id;
 	view.scene.add( controllerGrip );
 	view.scene.add( controller );
 	return controller;
@@ -51,8 +55,8 @@ const initializeWebXR = (view, options) => {
     const xr = view.mainLoop.gfxEngine.renderer.xr;
     
     const controllerModelFactory = new XRControllerModelFactory();
-    const controller1 = initializeController(view, controllerModelFactory, 0);
-    const controller2 = initializeController(view, controllerModelFactory, 1);
+    const controller1 = initializeController(view, controllerModelFactory, 0); // left
+    const controller2 = initializeController(view, controllerModelFactory, 1); // right
     const renderer = view.renderer;
     const scene = view.scene;
 
@@ -61,7 +65,6 @@ const initializeWebXR = (view, options) => {
 	const line = new THREE.Line( geometry );
 	line.name = 'line';
 	line.scale.z = 100;
-
 	controller1.add( line.clone() );
 	controller2.add( line.clone() );
 
@@ -103,11 +106,15 @@ const initializeWebXR = (view, options) => {
 	function controllergamepad(dt) {
 		const v = 10;
 		coords.as('EPSG:2154', c);
+
+		// x/y axis
 		if (controller1.gamepad && controller1.gamepad.axes) {
 			const axes = controller1.gamepad.axes;
 			if (axes[2]*axes[2] > 0.01) c.x += v*axes[2];
 			if (axes[3]*axes[3] > 0.01) c.y -= v*axes[3];
 		}
+
+		// z axis
 		if (controller2.gamepad && controller2.gamepad.axes) {
 			const axes = controller2.gamepad.axes;
 			if (axes[3]*axes[3] > 0.01) c.z -= v*axes[3];

@@ -25,7 +25,7 @@
 
         <script type="module">
 
-            // import * as THREE from 'three';
+        import * as THREE from 'three';
            import { XRButton } from 'three/addons/webxr/XRButton.js';
            import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
            import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
@@ -46,7 +46,7 @@
 
         // ---------- SETUP THE VR VIEW : ----------
 
-	    var altitude = 100;
+	    // var altitude = 10;
 	    var longitude = 2.5870426, latitude = 48.8409128; // mlv
 //	    var longitude = 2.4223264, latitude = 48.8447549; // smd
 //	    var longitude = 2.7922434, latitude = 50.4577818; // loos
@@ -56,7 +56,7 @@
             // Define camera initial position
             const placement = {         
                 coord: new itowns.Coordinates('EPSG:4326', longitude, latitude),
-                range: 200,
+                range: 100,
                 tilt: 0,
                 heading: 62,
             }
@@ -68,15 +68,20 @@
             const view = new itowns.GlobeView(viewerDiv, placement, {
                 webXR: { 
                     controllers: true,
-                    scale: 0.5 },
+                    scale: 0.7 },
             });
-	window.view = view;
+	        window.view = view;
             
-            console.log(view);
+            // console.log(view);
 
             // Instantiate three's VR Button
             const xrButton = XRButton.createButton(view.renderer);
             viewerDiv.appendChild(xrButton);
+
+            // Debug cube
+            const geometry = new THREE.BoxGeometry( 10, 10, 10 ); 
+            const material = new THREE.MeshBasicMaterial( {color: 0x00ff00} ); 
+            const cube = new THREE.Mesh( geometry, material ); 
 
             // ---------- DISPLAY ORTHO-IMAGES : ----------
 
@@ -137,23 +142,21 @@
             var color = new itowns.THREE.Color();
             var meshes = [];
             var scaler = function update(/* dt */) {
-                var i;
+                // var i;
                 var mesh;
                 if (meshes.length) {
                     view.notifyChange(view.camera3D, true);
                 }
-                for (i = 0; i < meshes.length; i++) {
+                for (let i = 0; i < meshes.length; i++) {
                     mesh = meshes[i];
                     if (mesh) {
+                        console.log(mesh.scale.z);
                         mesh.scale.z = Math.min(
                             1.0, mesh.scale.z + 0.1);
                         mesh.updateMatrixWorld(true);
                     }
                 }
                 meshes = meshes.filter(function filter(m) { return m.scale.z < 1; });
-                // console.log(hand1);
-                // console.log(view.camera3D.position);
-
             };
 
             view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, scaler);
@@ -196,50 +199,73 @@
             });
             view.addLayer(wfsBuildingLayer);
 
+            cube.position.set(view.camera3D.position.x + 1.5, view.camera3D.position.y + 1.5, view.camera3D.position.z);
+            const grip =  view.scene.children[0];
+            grip.position.set(cube.position.x,cube.position.y,cube.position.z);
+            // view.scene.children[0].scale(10,10)
+            grip.updateMatrixWorld();
+            cube.updateMatrixWorld();
+            // view.scene.add( cube );
+
+            console.log(grip);
+            meshes.push(cube);
+            meshes.push(grip);
+
+            let xrCamera = view.renderer.xr.getCamera(view.camera3D);
+            // console.log(xrCamera);
+
             // ---------- Set coontroller ----------
 
+            // const cont = view.scene.children.filter(function filter(c) { return c.name == 'controller1'; });
+            // meshes.push(view.scene.children[1]);
+
+            console.log(cube.position)
+
+            // meshes.push(grip);
+
+
             // add model to hand
-			controller1 = view.renderer.xr.getController( 0 );
-			view.scene.add( controller1 );
+			// controller1 = view.renderer.xr.getController( 0 );
+			// view.scene.add( controller1 );
 
-			controller2 = view.renderer.xr.getController( 1 );
-			view.scene.add( controller2 );
+			// controller2 = view.renderer.xr.getController( 1 );
+			// view.scene.add( controller2 );
 
-			const controllerModelFactory = new XRControllerModelFactory();
-            const handModelFactory = new XRHandModelFactory();
+			// const controllerModelFactory = new XRControllerModelFactory();
+            // const handModelFactory = new XRHandModelFactory();
 
 			// Hand 1
-			controllerGrip1 = view.renderer.xr.getControllerGrip( 0 );
-			controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
-			view.scene.add( controllerGrip1 );
+			// controllerGrip1 = view.renderer.xr.getControllerGrip( 0 );
+			// controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
+			// view.scene.add( controllerGrip1 );
 
-			hand1 = view.renderer.xr.getHand( 0 );
-            hand1.userData.currentHandModel = 0;
-			view.scene.add( hand1 );
+			// hand1 = view.renderer.xr.getHand( 0 );
+            // hand1.userData.currentHandModel = 0;
+			// view.scene.add( hand1 );
 
-            const model1 = handModelFactory.createHandModel( hand1, 'mesh' );
-            hand1.add(model1);
+            // const model1 = handModelFactory.createHandModel( hand1, 'mesh' );
+            // hand1.add(model1);
 
-            // Hand 2
-            controllerGrip2 = view.renderer.xr.getControllerGrip( 1 );
-            controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
-            view.scene.add( controllerGrip2 );
+            // // Hand 2
+            // controllerGrip2 = view.renderer.xr.getControllerGrip( 1 );
+            // controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
+            // view.scene.add( controllerGrip2 );
 
-            hand2 = view.renderer.xr.getHand( 1 );
-            hand2.userData.currentHandModel = 0;
-            view.scene.add( hand2 );
+            // hand2 = view.renderer.xr.getHand( 1 );
+            // hand2.userData.currentHandModel = 0;
+            // view.scene.add( hand2 );
 
-            const model2 = handModelFactory.createHandModel( hand2, 'mesh' );
-            hand2.add(model2);
+            // const model2 = handModelFactory.createHandModel( hand2, 'mesh' );
+            // hand2.add(model2);
 
 
-            function onSelect() {
+            // function onSelect() {
 
-					console.log('select');
+			// 		console.log('select');
 
-				}
+			// 	}
 
-            controller1.addEventListener( 'select', onSelect );
+            // controller1.addEventListener( 'select', onSelect );
 				// scene.add( controller );
 
 
