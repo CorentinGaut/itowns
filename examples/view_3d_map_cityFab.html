@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Itowns - WebXR Example</title>
+
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+    </head>
+    <body>
+        <div id="viewerDiv"></div>
+
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+                    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+                }
+            }
+        </script>
+
+        <!-- Import iTowns source code -->
+        <script src="../dist/itowns.js"></script>
+
+        <script type="module">
+
+            import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+            // ---------- SETUP THE VR VIEW : ----------
+
+            // let longitude = 2.5870426, latitude = 48.8409128; // mlv
+            var longitude = 2.4223264, latitude = 48.8447549; // smd
+            //var longitude = 2.7922434, latitude = 50.4577818; // loos
+            //var longitude = 2.4676636, latitude = 48.8007534; // creteil
+            //var longitude = 3.855731 , latitude = 43.959178; // st hippo
+
+            // Define camera initial position
+            const placement = {
+                coord: new itowns.Coordinates('EPSG:4326', longitude, latitude),
+                range: 15000,
+                tilt: 5,
+                heading: 62,
+            }
+
+            // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
+            const viewerDiv = document.getElementById('viewerDiv');
+
+            // Create a GlobeView
+            const view = new itowns.GlobeView(viewerDiv, placement, { webXR: { controllers: true } });
+
+            // Instantiate three's VR Button
+            const vrButton = VRButton.createButton(view.renderer);
+            viewerDiv.appendChild(vrButton);
+
+            // ---------- DISPLAY ORTHO-IMAGES : ----------
+
+            // Add one imagery layer to the scene. This layer's properties are
+            // defined in a json file, but it could be defined as a plain js
+            // object. See `Layer` documentation for more info.
+            itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then((config) => {
+                config.source = new itowns.WMTSSource(config.source);
+                view.addLayer(new itowns.ColorLayer('Ortho', config),
+                );
+            });
+
+            // ---------- DISPLAY A DIGITAL ELEVATION MODEL : ----------
+
+            // Add two elevation layers, each with a different level of detail.
+            // Here again, each layer's properties are defined in a json file.
+            function addElevationLayerFromConfig(config) {
+                config.source = new itowns.WMTSSource(config.source);
+                view.addLayer(
+                    new itowns.ElevationLayer(config.id, config),
+                );
+            }
+            itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json')
+                .then(addElevationLayerFromConfig);
+            itowns.Fetcher.json('./layers/JSONLayers/WORLD_DTM.json')
+                .then(addElevationLayerFromConfig);
+                
+                
+                
+            function colorBuildings(properties) {
+                if (properties.usage_1 === 'Résidentiel') {
+                    return color.set(0xFDFDFF);
+                } else if (properties.usage_1 === 'Annexe') {
+                    return color.set(0xC6C5B9);
+                } else if (properties.usage_1 === 'Commercial et services') {
+                    return color.set(0x62929E);
+                } else if (properties.usage_1 === 'Religieux') {
+                    return color.set(0x393D3F);
+                } else if (properties.usage_1 === 'Sportif') {
+                    return color.set(0x546A7B);
+                }
+
+                return color.set(0x555555);
+            }
+
+            function altitudeBuildings(properties) {
+                return properties.altitude_minimale_sol;
+            }
+
+            function extrudeBuildings(properties) {
+                return properties.hauteur;
+            }
+
+            function acceptFeature(properties) {
+                return !!properties.hauteur;
+            }
+
+
+            let color = new itowns.THREE.Color();
+            let meshes = [];
+            var wfsBuildingSource = new itowns.WFSSource({
+                url: 'https://data.geopf.fr/wfs/ows?',
+                version: '2.0.0',
+                typeName: 'BDTOPO_V3:batiment',
+                crs: 'EPSG:4326',
+                ipr: 'IGN',
+                format: 'application/json'
+            });
+
+
+            var wfsBuildingLayer = new itowns.FeatureGeometryLayer('WFS Building',{
+                batchId: function (property, featureId) { return featureId; },
+                onMeshCreated: function scaleZ(mesh) {
+                    mesh.children.forEach(c => {
+                        c.scale.z = 0.01;
+                        meshes.push(c);
+                    })
+                },
+                filter: acceptFeature,
+                source: wfsBuildingSource,
+                zoom: { min: 14 },
+
+                style: {
+                    fill: {
+                        color: colorBuildings,
+                        base_altitude: altitudeBuildings,
+                        extrusion_height: extrudeBuildings,
+                    }
+                }
+            });
+            view.addLayer(wfsBuildingLayer);
+
+        </script>
+    </body>
+</html>

@@ -1,5 +1,6 @@
 const path = require('path');
 const ESLintPlugin = require('eslint-webpack-plugin');
+const { server } = require('typescript');
 
 const mode = process.env.NODE_ENV;
 const noInline = process.env.noInline;
@@ -101,6 +102,7 @@ module.exports = () => {
             }),
         ],
         devServer: {
+            server: 'https',
             devMiddleware: {
                 publicPath: '/dist/',
             },
