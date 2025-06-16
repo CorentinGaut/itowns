@@ -26,7 +26,8 @@
         <script type="module">
 
             import * as THREE from 'three';
-            import { VRButton } from 'three/addons/webxr/VRButton.js';
+            // import { VRButton } from 'three/addons/webxr/VRButton.js';
+            import { ARButton } from 'three/addons/webxr/ARButton.js';
             import { createText } from 'three/addons/webxr/Text2D.js'
 
             // ---------- SETUP THE VR VIEW : ----------
@@ -52,8 +53,8 @@
             const view = new itowns.GlobeView(viewerDiv, placement, { webXR: { controllers: true } });
 
             // Instantiate three's VR Button
-            const vrButton = VRButton.createButton(view.renderer);
-            viewerDiv.appendChild(vrButton);
+            const arButton = ARButton.createButton(view.renderer);
+            viewerDiv.appendChild(arButton);
 
             // ---------- DISPLAY ORTHO-IMAGES : ----------
 
@@ -151,6 +152,7 @@
                 const geometry = new THREE.BoxGeometry( x, y, z );
                 const material = new THREE.MeshPhongMaterial( { color: color } );
                 const buttonMesh = new THREE.Mesh( geometry, material );
+                buttonMesh.name = 'textMesh';
                 buttonMesh.castShadow = true;
                 buttonMesh.receiveShadow = true;
                 return buttonMesh;
@@ -158,23 +160,25 @@
             }
 
 
-            const orangeButton = makeButtonMesh( 2, 1, 0.1, 0xffd3b5 );
-            orangeButton.position.set(2.587705, 48.840719, 50);
+            const orangeButton = makeButtonMesh( 200, 100, 10, 0xffd3b5 );
+            orangeButton.position.set(view.camera3D.position.x + 1.5, view.camera3D.position.y + 1.5, view.camera3D.position.z + 200);
             view.scene.add(orangeButton);
 
 
             // Debug cube
-            const geometry = new THREE.BoxGeometry( 10, 10, 10 ); 
+            const geometry = new THREE.BoxGeometry( 50, 50, 50 ); 
             const material = new THREE.MeshBasicMaterial( {color: 0x00ff00} ); 
             const cube = new THREE.Mesh( geometry, material ); 
-            cube.position.set(2.587705, 48.840719, 50);
+            cube.position.set(view.camera3D.position.x + 1.5, view.camera3D.position.y + 1.5, view.camera3D.position.z + 300 );
             cube.updateMatrixWorld();
-            view.scene.add( cube );
+            // view.scene.add( cube );
 
 
-            // update
+            // Debug scene
             var debug = function update(/* dt */) {
                 console.log(view.scene.children);
+                console.log(view.camera.camera3D.position);
+                console.log(cube.position);
             };
 
             view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, debug);
