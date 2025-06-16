@@ -127,12 +127,6 @@
 
             var wfsBuildingLayer = new itowns.FeatureGeometryLayer('WFS Building',{
                 batchId: function (property, featureId) { return featureId; },
-                onMeshCreated: function scaleZ(mesh) {
-                    mesh.children.forEach(c => {
-                        c.scale.z = 0.01;
-                        meshes.push(c);
-                    })
-                },
                 filter: acceptFeature,
                 source: wfsBuildingSource,
                 zoom: { min: 14 },
@@ -150,35 +144,44 @@
             // --- create button mesh ---
             function makeButtonMesh( x, y, z, color ) {
                 const geometry = new THREE.BoxGeometry( x, y, z );
-                const material = new THREE.MeshPhongMaterial( { color: color } );
+                const material = new THREE.MeshBasicMaterial( { color: color } );
                 const buttonMesh = new THREE.Mesh( geometry, material );
                 buttonMesh.name = 'textMesh';
-                buttonMesh.castShadow = true;
-                buttonMesh.receiveShadow = true;
+                // buttonMesh.castShadow = true;
+                // buttonMesh.receiveShadow = true;
                 return buttonMesh;
 
             }
 
 
-            const orangeButton = makeButtonMesh( 200, 100, 10, 0xffd3b5 );
-            orangeButton.position.set(view.camera3D.position.x + 1.5, view.camera3D.position.y + 1.5, view.camera3D.position.z + 200);
+            // Button
+            const orangeButton = makeButtonMesh( 20, 10, 1, 0xffd3b5 );
+            const orangeButton2 = makeButtonMesh( 20, 10, 1, 0xffd3b5 );
+            // orangeButton.position.set(4201550.647914, 189841.639560, 4779088.891893134);
+            orangeButton2.position.set(4201580.647914, 189851.639560, 4779068.891893134);
+
+            view.camera3D.getWorldPosition(orangeButton.position);
+            view.camera3D.getWorldQuaternion(orangeButton.quaternion);
+
+            view.camera3D.getWorldQuaternion(orangeButton2.quaternion);
+
+            
+            
+            orangeButton.updateMatrixWorld();
+            orangeButton2.updateMatrixWorld();
+            // orangeButton.updateMatrixWorld();
+            console.log(orangeButton);
+            console.log(orangeButton2);
+
             view.scene.add(orangeButton);
-
-
-            // Debug cube
-            const geometry = new THREE.BoxGeometry( 50, 50, 50 ); 
-            const material = new THREE.MeshBasicMaterial( {color: 0x00ff00} ); 
-            const cube = new THREE.Mesh( geometry, material ); 
-            cube.position.set(view.camera3D.position.x + 1.5, view.camera3D.position.y + 1.5, view.camera3D.position.z + 300 );
-            cube.updateMatrixWorld();
-            // view.scene.add( cube );
-
-
+            view.scene.add(orangeButton2);
             // Debug scene
             var debug = function update(/* dt */) {
-                console.log(view.scene.children);
+                console.log(view.scene);
                 console.log(view.camera.camera3D.position);
-                console.log(cube.position);
+                view.camera3D.getWorldQuaternion(orangeButton2.quaternion);
+                orangeButton2.updateMatrixWorld();
+
             };
 
             view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, debug);
