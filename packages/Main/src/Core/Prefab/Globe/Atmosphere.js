@@ -159,9 +159,9 @@ class Atmosphere extends GeometryLayer {
         if (altitude < limitAlti) {
             const t = (limitAlti - altitude) / limitAlti;
             colorSky.copy(spaceColor).lerp(skyBaseColor, t);
-            renderer.setClearColor(colorSky, renderer.getClearAlpha());
+            renderer.setClearColor(colorSky, 0);
         } else {
-            renderer.setClearColor(spaceColor, renderer.getClearAlpha());
+            renderer.setClearColor(spaceColor, 0);
         }
     }
 

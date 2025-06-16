@@ -25,12 +25,14 @@
 
         <script type="module">
 
+            import * as THREE from 'three';
             import { VRButton } from 'three/addons/webxr/VRButton.js';
+            import { createText } from 'three/addons/webxr/Text2D.js'
 
             // ---------- SETUP THE VR VIEW : ----------
 
-            // let longitude = 2.5870426, latitude = 48.8409128; // mlv
-            var longitude = 2.4223264, latitude = 48.8447549; // smd
+            let longitude = 2.587640, latitude = 48.840638; // mlv
+            // var longitude = 2.4223264, latitude = 48.8447549; // smd
             //var longitude = 2.7922434, latitude = 50.4577818; // loos
             //var longitude = 2.4676636, latitude = 48.8007534; // creteil
             //var longitude = 3.855731 , latitude = 43.959178; // st hippo
@@ -38,7 +40,7 @@
             // Define camera initial position
             const placement = {
                 coord: new itowns.Coordinates('EPSG:4326', longitude, latitude),
-                range: 15000,
+                range: 100,
                 tilt: 5,
                 heading: 62,
             }
@@ -143,6 +145,39 @@
                 }
             });
             view.addLayer(wfsBuildingLayer);
+
+            // --- create button mesh ---
+            function makeButtonMesh( x, y, z, color ) {
+                const geometry = new THREE.BoxGeometry( x, y, z );
+                const material = new THREE.MeshPhongMaterial( { color: color } );
+                const buttonMesh = new THREE.Mesh( geometry, material );
+                buttonMesh.castShadow = true;
+                buttonMesh.receiveShadow = true;
+                return buttonMesh;
+
+            }
+
+
+            const orangeButton = makeButtonMesh( 2, 1, 0.1, 0xffd3b5 );
+            orangeButton.position.set(2.587705, 48.840719, 50);
+            view.scene.add(orangeButton);
+
+
+            // Debug cube
+            const geometry = new THREE.BoxGeometry( 10, 10, 10 ); 
+            const material = new THREE.MeshBasicMaterial( {color: 0x00ff00} ); 
+            const cube = new THREE.Mesh( geometry, material ); 
+            cube.position.set(2.587705, 48.840719, 50);
+            cube.updateMatrixWorld();
+            view.scene.add( cube );
+
+
+            // update
+            var debug = function update(/* dt */) {
+                console.log(view.scene.children);
+            };
+
+            view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, debug);
 
         </script>
     </body>
