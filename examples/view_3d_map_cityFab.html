@@ -29,6 +29,7 @@
             // import { VRButton } from 'three/addons/webxr/VRButton.js';
             import { ARButton } from 'three/addons/webxr/ARButton.js';
             import { createText } from 'three/addons/webxr/Text2D.js';
+            import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
 
             // ---- Get Pos from server ----
@@ -58,26 +59,20 @@
                         console.log(pos);
                         return pos;
                     });               
-            }
-
-            // let pos = null;
-                    
-
-            // geoPos = setInterval(getGeoPos, 1000);
-        
+            }        
 
             // ---------- SETUP THE VR VIEW : ----------
 
-            //let longitude = 2.587640, latitude = 48.840638; // mlv
-            var longitude = 2.4223264, latitude = 48.8447549; // smd
+            let longitude = 2.587640, latitude = 48.840638; // mlv
+            // var longitude = 2.4223264, latitude = 48.8447549; // smd
             //var longitude = 2.7922434, latitude = 50.4577818; // loos
-            //var longitude = 2.4676636, latitude = 48.8007534; // creteil
+            // var longitude = 3.294129, latitude = 48.483560; // gouaix
             //var longitude = 3.855731 , latitude = 43.959178; // st hippo
 
             // Define camera initial position
             const placement = {
                 coord: new itowns.Coordinates('EPSG:4326', longitude, latitude),
-                range: 100,
+                range: 25,
                 tilt: 5,
                 heading: 62,
             }
@@ -182,7 +177,7 @@
                 const geometry = new THREE.BoxGeometry( x, y, z );
                 const material = new THREE.MeshBasicMaterial( { color: color } );
                 const buttonMesh = new THREE.Mesh( geometry, material );
-                buttonMesh.name = 'textMesh';
+                // buttonMesh.name = 'textMesh';
                 // buttonMesh.castShadow = true;
                 // buttonMesh.receiveShadow = true;
                 return buttonMesh;
@@ -193,26 +188,37 @@
             // Button
             const greenButton = makeButtonMesh( 20, 10, 1, 0x00ff00 );
             const orangeButton2 = makeButtonMesh( 20, 10, 1, 0xffd3b5 );
+            orangeButton2.name = 'orange';
             greenButton.position.set(4201550.647914, 189841.639560, 4779088.891893134);
             orangeButton2.position.set(4201580.647914, 189851.639560, 4779068.891893134);
 
-            greenButton.quaternion.identity();
+            greenButton.quaternion.set(0.28566193063505607, 0.62914506925365, 0.6582205539263786, 0.29886359030253884);
 
-            // view.camera3D.getWorldPosition(greenButton.position);
-            // view.camera3D.getWorldQuaternion(greenButton.quaternion);
- 
-            view.camera3D.getWorldQuaternion(orangeButton2.quaternion);
-
-            
-            
             greenButton.updateMatrixWorld();
+
+            // let threeMeshLayer = new itowns.GeometryLayer('MeshGreen', greenButton, {
+            //     visible: false,
+            //     cacheLifeTime: Infinity,
+            //     source: false,
+            // });
+            // threeMeshLayer.update = function () {
+            //     // console.log('update');
+            // };
+            // view.addLayer(threeMeshLayer);
+
             orangeButton2.updateMatrixWorld();
-            // orangeButton.updateMatrixWorld();
-            console.log(greenButton);
-            console.log(orangeButton2);
+            greenButton.updateMatrixWorld();
 
             view.scene.add(greenButton);
             view.scene.add(orangeButton2);
+
+            // Obj loader
+            // const loader = new OBJLoader();
+            // loader.load('./obj/house.obj', function (object) {
+            //     object.position.set(4228868.633262834, 242989.91532476764, 4752734.68239906);
+            //     object.updateMatrixWorld();
+            // });
+
             // Debug scene
             var debug = function update(/* dt */) {
                 // console.log(view.scene);

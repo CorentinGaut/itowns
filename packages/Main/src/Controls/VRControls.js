@@ -37,9 +37,13 @@ class VRControls {
 
         const controllerModelFactory = new XRControllerModelFactory();
 
+        // Add line to controller
+        const geometry = new THREE.BufferGeometry();
+        geometry.setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -5)]);
+
         for (let i = 0; i < VRControls.MAX_NUMBER_CONTROLLERS; i++) {
             const controller = this.webXRManager.getController(i);
-
+            controller.add(new THREE.Line(geometry));
 
             controller.addEventListener('connected', (event) => {
                 controller.name = event.data.handedness;    // Left or right
