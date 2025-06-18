@@ -360,7 +360,19 @@ Adding a few internal states for reactivity
     // Left button pressed.
     /* c8 ignore next 3 */
     onLeftButtonPressed() {
-    // No operation defined.
+        const raycaster = new THREE.Raycaster();
+        raycaster.ray.origin = this.groupXR.position.clone().add(this.controllers[0].position);
+        raycaster.ray.direction = (new THREE.Vector3(0, 0, -5)).applyQuaternion(this.groupXR.quaternion);
+
+        // calculate objects intersecting the picking ray
+        const intersects = raycaster.intersectObjects(this.view.scene.children);
+
+        if (intersects.length > 0) {
+            const mesh = intersects[0].object;
+            mesh.material = new THREE.MeshBasicMaterial({ color: 0xffd3b5 });
+            this.view.notifyChange();
+        }
+
     }
 
     // Axis changed.

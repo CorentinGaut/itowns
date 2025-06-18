@@ -56,7 +56,7 @@
                     .then((json) => {
                         if (!json) return;  
                         pos = json;
-                        console.log(pos);
+                        // console.log(pos);
                         return pos;
                     });               
             }        
@@ -221,8 +221,7 @@
 
             // Debug scene
             var debug = function update(/* dt */) {
-                // console.log(view.scene);
-                console.log(view);
+                // console.log(view);
                 view.camera3D.getWorldQuaternion(orangeButton2.quaternion);
                 orangeButton2.updateMatrixWorld();
                 geoPos = getGeoPos();
