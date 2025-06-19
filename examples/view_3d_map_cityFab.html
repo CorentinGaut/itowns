@@ -22,14 +22,13 @@
 
         <!-- Import iTowns source code -->
         <script src="../dist/itowns.js"></script>
-
         <script type="module">
 
             import * as THREE from 'three';
-            // import { VRButton } from 'three/addons/webxr/VRButton.js';
             import { ARButton } from 'three/addons/webxr/ARButton.js';
             import { createText } from 'three/addons/webxr/Text2D.js';
             import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+            import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
 
             // ---- Get Pos from server ----
@@ -38,35 +37,35 @@
             let geoPos = null;
 
 
-            function getGeoPos () {
-                let pos = null;
-                fetch(`${baseUrl}/geoPos`, {
-                    method: 'GET',
-                    })
-                    .then((response) => {
-                        try {
-                        if (!response.ok) {
-                            throw new Error(`Response status: ${response.status}`);
-                        }
-                        return response.json();
-                        } catch (error) {
-                        console.error(error.message);
-                        }
-                    })
-                    .then((json) => {
-                        if (!json) return;  
-                        pos = json;
-                        // console.log(pos);
-                        return pos;
-                    });               
-            }        
+            // function getGeoPos () {
+            //     let pos = null;
+            //     fetch(`${baseUrl}/geoPos`, {
+            //         method: 'GET',
+            //         })
+            //         .then((response) => {
+            //             try {
+            //             if (!response.ok) {
+            //                 throw new Error(`Response status: ${response.status}`);
+            //             }
+            //             return response.json();
+            //             } catch (error) {
+            //             console.error(error.message);
+            //             }
+            //         })
+            //         .then((json) => {
+            //             if (!json) return;  
+            //             pos = json;
+            //             // console.log(pos);
+            //             return pos;
+            //         });               
+            // }        
 
             // ---------- SETUP THE VR VIEW : ----------
 
             let longitude = 2.587640, latitude = 48.840638; // mlv
-            // var longitude = 2.4223264, latitude = 48.8447549; // smd
+            //var longitude = 2.4223264, latitude = 48.8447549; // smd
             //var longitude = 2.7922434, latitude = 50.4577818; // loos
-            // var longitude = 3.294129, latitude = 48.483560; // gouaix
+            //var longitude = 3.294129, latitude = 48.483560; // gouaix
             //var longitude = 3.855731 , latitude = 43.959178; // st hippo
 
             // Define camera initial position
@@ -161,7 +160,6 @@
                 filter: acceptFeature,
                 source: wfsBuildingSource,
                 zoom: { min: 14 },
-
                 style: {
                     fill: {
                         color: colorBuildings,
@@ -172,59 +170,49 @@
             });
             view.addLayer(wfsBuildingLayer);
 
-            // --- create button mesh ---
+            // --- Create button mesh ---
             function makeButtonMesh( x, y, z, color ) {
                 const geometry = new THREE.BoxGeometry( x, y, z );
                 const material = new THREE.MeshBasicMaterial( { color: color } );
                 const buttonMesh = new THREE.Mesh( geometry, material );
-                // buttonMesh.name = 'textMesh';
-                // buttonMesh.castShadow = true;
-                // buttonMesh.receiveShadow = true;
-                return buttonMesh;
 
+                return buttonMesh;
             }
 
 
-            // Button
-            const greenButton = makeButtonMesh( 20, 10, 1, 0x00ff00 );
-            const orangeButton2 = makeButtonMesh( 20, 10, 1, 0xffd3b5 );
-            orangeButton2.name = 'orange';
-            greenButton.position.set(4201550.647914, 189841.639560, 4779088.891893134);
-            orangeButton2.position.set(4201580.647914, 189851.639560, 4779068.891893134);
+            // ---- Objects ----
+            const greenMesh = makeButtonMesh( 20, 10, 1, 0x00ff00 );
+            const orangeMesh = makeButtonMesh( 20, 10, 1, 0xffd3b5 );
+            orangeMesh.name = 'orange';
+            greenMesh.name = 'green';
+            greenMesh.position.set(4201550.647914, 189841.639560, 4779088.891893134);
+            orangeMesh.position.set(4201580.647914, 189851.639560, 4779068.891893134);
 
-            greenButton.quaternion.set(0.28566193063505607, 0.62914506925365, 0.6582205539263786, 0.29886359030253884);
+            greenMesh.quaternion.set(0.28566193063505607, 0.62914506925365, 0.6582205539263786, 0.29886359030253884); // testing quaternion rotation
+            
+            orangeMesh.updateMatrixWorld();
+            greenMesh.updateMatrixWorld();
+            
+            view.scene.add(greenMesh);
+            view.scene.add(orangeMesh);
 
-            greenButton.updateMatrixWorld();
+            // ---- Transform controls ----
 
-            // let threeMeshLayer = new itowns.GeometryLayer('MeshGreen', greenButton, {
-            //     visible: false,
-            //     cacheLifeTime: Infinity,
-            //     source: false,
-            // });
-            // threeMeshLayer.update = function () {
-            //     // console.log('update');
-            // };
-            // view.addLayer(threeMeshLayer);
+            const control = new TransformControls(view.camera.camera3D, view.renderer.domElement);
 
-            orangeButton2.updateMatrixWorld();
-            greenButton.updateMatrixWorld();
+            control.attach(greenMesh);
 
-            view.scene.add(greenButton);
-            view.scene.add(orangeButton2);
+            const guizmos = control.getHelper();
+            // guizmos.position.set(4201550.647914, 189841.639560, 4779088.891893134);
+            guizmos.updateMatrixWorld();
+            view.scene.add( guizmos );
 
-            // Obj loader
-            // const loader = new OBJLoader();
-            // loader.load('./obj/house.obj', function (object) {
-            //     object.position.set(4228868.633262834, 242989.91532476764, 4752734.68239906);
-            //     object.updateMatrixWorld();
-            // });
-
-            // Debug scene
+            // ---- Debug scene ----
             var debug = function update(/* dt */) {
                 // console.log(view);
-                view.camera3D.getWorldQuaternion(orangeButton2.quaternion);
-                orangeButton2.updateMatrixWorld();
-                geoPos = getGeoPos();
+                view.camera3D.getWorldQuaternion(orangeMesh.quaternion);
+                orangeMesh.updateMatrixWorld();
+                // geoPos = getGeoPos();
             };
 
             view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, debug);
