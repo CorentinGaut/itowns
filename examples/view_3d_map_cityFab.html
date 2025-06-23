@@ -174,6 +174,9 @@
             function makeButtonMesh( x, y, z, color ) {
                 const geometry = new THREE.BoxGeometry( x, y, z );
                 const material = new THREE.MeshBasicMaterial( { color: color } );
+                material.wireframe = true;
+                material.transparent = true;
+                material.opacity = 0.8;
                 const buttonMesh = new THREE.Mesh( geometry, material );
 
                 return buttonMesh;
@@ -181,14 +184,19 @@
 
 
             // ---- Objects ----
-            const greenMesh = makeButtonMesh( 20, 10, 1, 0x00ff00 );
+            const greenMesh = makeButtonMesh( 60, 20, 50, 0x00ff00 );
             const orangeMesh = makeButtonMesh( 20, 10, 1, 0xffd3b5 );
             orangeMesh.name = 'orange';
             greenMesh.name = 'green';
-            greenMesh.position.set(4201550.647914, 189841.639560, 4779088.891893134);
-            orangeMesh.position.set(4201580.647914, 189851.639560, 4779068.891893134);
+            greenMesh.position.set(4201605.618022248, 189923.89924819994, 4778955.033659566);
+            orangeMesh.position.set(4201580.647914, 189851.639560, 4778988.891893134);
 
-            greenMesh.quaternion.set(0.28566193063505607, 0.62914506925365, 0.6582205539263786, 0.29886359030253884); // testing quaternion rotation
+            // set rotation with world dir
+            const q = new THREE.Quaternion();
+            const dirWorld = greenMesh.position.clone().normalize();
+            const upLocal = greenMesh.up.clone();
+            q.setFromUnitVectors( dirWorld, upLocal );
+            greenMesh.applyQuaternion(q);
             
             orangeMesh.updateMatrixWorld();
             greenMesh.updateMatrixWorld();
@@ -204,6 +212,7 @@
 
             const guizmos = control.getHelper();
             // guizmos.position.set(4201550.647914, 189841.639560, 4779088.891893134);
+            // guizmos.quaternion.set(a.x, a.y, a.z, w);
             guizmos.updateMatrixWorld();
             view.scene.add( guizmos );
 
@@ -213,6 +222,7 @@
                 view.camera3D.getWorldQuaternion(orangeMesh.quaternion);
                 orangeMesh.updateMatrixWorld();
                 // geoPos = getGeoPos();
+                console.log(view.camera.camera3D.position);
             };
 
             view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, debug);
