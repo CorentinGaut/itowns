@@ -22,7 +22,7 @@
         <!-- Import iTowns source code -->
         <script src="../dist/itowns.js"></script>
         <script src="../dist/debug.js"></script>
-        <script src="js/GUI/GuiTools.js"></script>
+        <!-- <script src="js/GUI/GuiTools.js"></script> -->
         <div id="description">
             <p><b>Building Information</b></p>
             <ul id="info">
@@ -34,15 +34,12 @@
             import { ARButton } from 'three/addons/webxr/ARButton.js';
             import { createText } from 'three/addons/webxr/Text2D.js';
             import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-
-            
+            // import Picking from './Core/Picking'; 
 
 
             // ---- Get Pos from server ----
-
             const baseUrl = 'http://localhost:8000';
             let geoPos = null;
-
 
             // function getGeoPos () {
             //     let pos = null;
@@ -67,9 +64,24 @@
             //         });               
             // }        
 
+
+            // ------ Get geolocisation from helmet ------
+            function getCurrentPosition() {
+                return new Promise((resolve, reject) => {
+                    if (!navigator.geolocation) {
+                        reject(new Error("Geolocation is not supported by your browser"));
+                    return;
+                    }
+                    navigator.geolocation.getCurrentPosition(resolve, reject);
+                });
+            }
+
+            const position = await getCurrentPosition();
+
             // ---------- SETUP THE VR VIEW : ----------
 
-            let longitude = 2.587640, latitude = 48.840638; // mlv
+            let longitude = position.coords.longitude, latitude = position.coords.latitude;
+            // let longitude = 2.587640, latitude = 48.840638; // mlv
             //var longitude = 2.4223264, latitude = 48.8447549; // smd
             //var longitude = 2.7922434, latitude = 50.4577818; // loos
             //var longitude = 3.294129, latitude = 48.483560; // gouaix
@@ -80,12 +92,11 @@
                 coord: new itowns.Coordinates('EPSG:4326', longitude, latitude),
                 range: 25,
                 tilt: 5,
-                heading: 62,
+                heading: 42,
             }
 
             // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
             const viewerDiv = document.getElementById('viewerDiv');
-
             
             // Create a GlobeView
             const view = new itowns.GlobeView(viewerDiv, placement, { webXR: { controllers: true } });
@@ -97,7 +108,6 @@
             // const debugMenu = new GuiTools('menuDiv', view, 300);
 
             // ---------- DISPLAY ORTHO-IMAGES : ----------
-
             // Add one imagery layer to the scene. This layer's properties are
             // defined in a json file, but it could be defined as a plain js
             // object. See `Layer` documentation for more info.
@@ -108,7 +118,6 @@
             });
 
             // ---------- DISPLAY A DIGITAL ELEVATION MODEL : ----------
-
             // Add two elevation layers, each with a different level of detail.
             // Here again, each layer's properties are defined in a json file.
             function addElevationLayerFromConfig(config) {
@@ -165,7 +174,7 @@
             });
 
 
-            const wfsBuildingWireframLayer = new itowns.FeatureGeometryLayer('WFS Building Wirefram',{
+            const wfsBuildingWireframLayer = new itowns.FeatureGeometryLayer('WFS Building Wireframe',{
                 batchId: function (property, featureId) { return featureId; },
                 filter: acceptFeature,
                 source: wfsBuildingSource,
@@ -191,7 +200,7 @@
                 zoom: { min: 14 },
                 style: {
                     fill: {
-                        color: new THREE.Color(0xffffff),
+                        color: colorBuildings,
                         base_altitude: altitudeBuildings,
                         extrusion_height: extrudeBuildings,
                     }
@@ -228,6 +237,13 @@
             // set ENH orientation, looking at the sky (Z axis), so Y axis look to the north
             blackMeshWireframe.lookAt(placement.coord.geodesicNormal.clone().add(blackMeshWireframe.position));
             whiteMesh.lookAt(placement.coord.geodesicNormal.clone().add(blackMeshWireframe.position));
+
+            // set Object to the ground
+            var setObjectToGround = function update(/* dt */) {
+                itowns.DEMUtils.placeObjectOnGround(view.tileLayer, 'EPSG:4978', blackMeshWireframe);
+                itowns.DEMUtils.placeObjectOnGround(view.tileLayer, 'EPSG:4978', whiteMesh);   
+            };
+
             
             orangeMesh.updateMatrixWorld();
             blackMeshWireframe.updateMatrixWorld();
@@ -237,20 +253,16 @@
             view.scene.add(orangeMesh);
             view.scene.add(whiteMesh);
 
-
             // ---- Update ----
             var debug = function update(/* dt */) {
                 view.camera3D.getWorldQuaternion(orangeMesh.quaternion);
                 orangeMesh.updateMatrixWorld();
                 const f = view.getLayers().filter((layer) => layer.isFeatureGeometryLayer);
-                console.log(view); 
+                // console.log(view);
+                // console.log(view.renderer.xr.getReferenceSpace()); 
                                
             };
 
-            var setObjectToGround = function update(/* dt */) {
-                itowns.DEMUtils.placeObjectOnGround(view.tileLayer, 'EPSG:4978', blackMeshWireframe);
-                itowns.DEMUtils.placeObjectOnGround(view.tileLayer, 'EPSG:4978', whiteMesh);   
-            };
 
             view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, debug);
             // view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_LAYER_UPDATE, setObjectToGround);
@@ -299,6 +311,8 @@
                     });
                 }
             }
+
+
 
         </script>
     </body>

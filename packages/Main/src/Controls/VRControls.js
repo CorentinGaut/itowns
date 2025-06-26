@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Coordinates } from '@itowns/geographic';
 import DEMUtils from 'Utils/DEMUtils';
 import { XRControllerModelFactory } from 'ThreeExtended/webxr/XRControllerModelFactory';
+import { Layer } from 'Main';
 
 /**
  * @property {Array} controllers - WebXR controllers list
@@ -357,22 +358,39 @@ Adding a few internal states for reactivity
         }
     }
 
+    /**
+     * 
+     * @param {THREE.Object3D} obj 
+     * @returns {Layer}
+     */
+    findLayerInParent(obj) {
+        if (obj.layer) {
+            return obj.layer;
+        }
+        if (obj.parent) {
+            return this.findLayerInParent(obj.parent);
+        }
+    }
+
     // Left button pressed.
     /* c8 ignore next 3 */
     onLeftButtonPressed() {
-        // const raycaster = new THREE.Raycaster();
-        // raycaster.ray.origin = this.groupXR.position.clone().add(this.controllers[0].position);
-        // raycaster.ray.direction = (new THREE.Vector3(0, 0, -5)).applyQuaternion(this.groupXR.quaternion);
+        const raycaster = new THREE.Raycaster();
+        raycaster.ray.origin = this.groupXR.position.clone().add(this.controllers[0].position);
+        raycaster.ray.direction = (new THREE.Vector3(0, 0, -5)).applyQuaternion(this.groupXR.quaternion);
 
-        // // calculate objects intersecting the picking ray
-        // const intersects = raycaster.intersectObjects(this.view.scene.children);
+        // calculate objects intersecting the picking ray
+        const intersects = raycaster.intersectObjects(this.view.scene.children);
 
-        // if (intersects.length > 0) {
-        //     const mesh = intersects[0].object;
-        //     mesh.material = new THREE.MeshBasicMaterial({ color: 0xffd3b5 });
-        //     this.view.notifyChange();
-        // }
+        console.log(intersects[0]);
+        if (intersects.length > 0 && intersects[0].object.layer.isFeatureGeometryLayer) {
+            const layer = this.findLayerInParent(intersects[0].object);
+            const mesh = intersects[0].object;
+            console.log(layer);
 
+            const batchId = intersects[0].object.geometry.attributes.batchId.array[intersects[0].face.a];
+            const properties = intersects[0].object.feature.geometries[batchId].properties;
+        }
     }
 
     // Axis changed.
