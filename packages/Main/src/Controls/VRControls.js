@@ -23,6 +23,8 @@ class VRControls {
         this.webXRManager = _view.mainLoop.gfxEngine.renderer.xr;
         this.cameraOnGround = cameraOnGround;
 
+        this.lines = [];
+
         this.rightButtonPressed = false;
         this.controllers = [];
         this.initControllers();
@@ -44,9 +46,12 @@ class VRControls {
         const geometry = new THREE.BufferGeometry();
         geometry.setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -5)]);
 
+
         for (let i = 0; i < VRControls.MAX_NUMBER_CONTROLLERS; i++) {
             const controller = this.webXRManager.getController(i);
-            controller.add(new THREE.Line(geometry));
+            const line = new THREE.Line(geometry);
+            controller.add(line);
+            this.lines.push(line);
 
             controller.addEventListener('connected', (event) => {
                 controller.name = event.data.handedness;    // Left or right
@@ -66,11 +71,50 @@ class VRControls {
                 this.setupEventListeners(controller);
             });
 
+            this.addColorCube();
+
             controller.addEventListener('disconnected', function removeCtrl() {
                 this.remove(this.children[0]);
             });
         }
     }
+
+
+        /**
+     * Debug
+     */
+    addColorCube() { 
+        // --- Create button mesh ---
+        function makeButtonMesh(x, y, z, c, opacity, wireframe) {
+            const geometry = new THREE.BoxGeometry(x, y, z);
+            const material = new THREE.MeshBasicMaterial({ color: c });
+            material.wireframe = wireframe;
+            material.transparent = true;
+            material.opacity = opacity;
+            const buttonMesh = new THREE.Mesh(geometry, material);
+            buttonMesh.name = 'button';
+
+            return buttonMesh;
+        }
+
+        const groupSelectColor = new THREE.Group();
+
+        const red = makeButtonMesh(0.1, 0.1, 0.1, 0x008000, 1, false);
+        red.position.set(-0.2, 0, 0);
+        const green = makeButtonMesh(0.1, 0.1, 0.1, 0xFF0000, 1, false);
+        green.position.set(0, 0, 0);
+        const blue = makeButtonMesh(0.1, 0.1, 0.1, 0x0000FF, 1, false);
+        blue.position.set(0.2, 0, 0);
+
+        groupSelectColor.add(red);
+        groupSelectColor.add(green);
+        groupSelectColor.add(blue);
+
+        groupSelectColor.position.set(0, 0.2, -0.5);
+        groupSelectColor.name = 'selector';
+
+        this.webXRManager.getController(1).add(groupSelectColor);
+    } 
 
     bindGripController(controllerModelFactory, gripController, vrHeadSet) {
         gripController.add(controllerModelFactory.createControllerModel(gripController));
@@ -381,20 +425,29 @@ Adding a few internal states for reactivity
     /* c8 ignore next 3 */
     onLeftButtonPressed() {
         const raycaster = new THREE.Raycaster();
-        raycaster.ray.origin = this.groupXR.position.clone().add(this.controllers[0].position);
-        raycaster.ray.direction = (new THREE.Vector3(0, 0, -5)).applyQuaternion(this.groupXR.quaternion);
+        const pos = new THREE.Vector3();
+        const dir = new THREE.Vector3();
 
+        // right line
+        this.lines[0].getWorldPosition(pos);
+        this.lines[0].getWorldDirection(dir);
+
+        raycaster.ray.origin = pos;
+        raycaster.ray.direction = dir.multiplyScalar(-1);
+        
         // calculate objects intersecting the picking ray
         const intersects = raycaster.intersectObjects(this.view.scene.children);
+        if (intersects.length > 0 && intersects[0].object.name == 'button') {
 
-        console.log(intersects[0]);
-        if (intersects.length > 0 && intersects[0].object.layer.isFeatureGeometryLayer) {
-            const layer = this.findLayerInParent(intersects[0].object);
-            const mesh = intersects[0].object;
-            console.log(layer);
-
-            const batchId = intersects[0].object.geometry.attributes.batchId.array[intersects[0].face.a];
-            const properties = intersects[0].object.feature.geometries[batchId].properties;
+        // TO-DO change color from a batchID
+            // const mesh = intersects[0].object;
+            //     mesh.material = new THREE.MeshBasicMaterial({ color: 0xffd3b5 });
+            //     this.view.notifyChange();
+            // for (const layer of this.view.getLayers()) {
+            //     if (layer.id === 'WFS Building') {
+            //         console.log(layer);
+            //     }
+            // }
         }
     }
 

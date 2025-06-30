@@ -213,54 +213,42 @@
 
             view.addLayer(wfsBuildingLayer);
 
-            // --- Create button mesh ---
-            function makeButtonMesh( x, y, z, color, opaciy, wireframe ) {
-                const geometry = new THREE.BoxGeometry( x, y, z );
-                const material = new THREE.MeshBasicMaterial( { color: color } );
-                material.wireframe = wireframe;
-                material.transparent = true;
-                material.opacity = opaciy;
-                const buttonMesh = new THREE.Mesh( geometry, material );
-
-                return buttonMesh;
-            }
-
             // ---- Objects ----
-            const blackMeshWireframe = makeButtonMesh( 60, 60, 20, 0x000000, 1, true );
-            const whiteMesh = makeButtonMesh( 60, 60, 20, 0xffffff, 0.5, false );
+            // const blackMeshWireframe = makeButtonMesh( 60, 60, 20, 0x000000, 1, true );
+            // const whiteMesh = makeButtonMesh( 60, 60, 20, 0xffffff, 0.5, false );
 
-            const orangeMesh = makeButtonMesh( 20, 10, 1, 0xffd3b5, 0.5, false );
-            orangeMesh.name = 'orange';
-            blackMeshWireframe.name = 'black-wireframe';
-            blackMeshWireframe.position.set(4201655.618022248, 189923.89924819994, 4778955.033659566);
-            whiteMesh.position.set(4201655.618022248, 189923.89924819994, 4778955.033659566);
-            orangeMesh.position.set(4201580.647914, 189851.639560, 4778988.891893134);
+            // const orangeMesh = makeButtonMesh( 20, 10, 1, 0xffd3b5, 0.5, false );
+            // orangeMesh.name = 'orange';
+            // blackMeshWireframe.name = 'black-wireframe';
+            // blackMeshWireframe.position.set(4201655.618022248, 189923.89924819994, 4778955.033659566);
+            // whiteMesh.position.set(4201655.618022248, 189923.89924819994, 4778955.033659566);
+            // orangeMesh.position.set(4201580.647914, 189851.639560, 4778988.891893134);
 
             const coord = new itowns.Coordinates('EPSG:4978', 4201605.618022248, 189923.89924819994, 4778955.033659566);
 
             // set ENH orientation, looking at the sky (Z axis), so Y axis look to the north
-            blackMeshWireframe.lookAt(placement.coord.geodesicNormal.clone().add(blackMeshWireframe.position));
-            whiteMesh.lookAt(placement.coord.geodesicNormal.clone().add(blackMeshWireframe.position));
+            // blackMeshWireframe.lookAt(placement.coord.geodesicNormal.clone().add(blackMeshWireframe.position));
+            // whiteMesh.lookAt(placement.coord.geodesicNormal.clone().add(blackMeshWireframe.position));
 
             // set Object to the ground
-            var setObjectToGround = function update(/* dt */) {
-                itowns.DEMUtils.placeObjectOnGround(view.tileLayer, 'EPSG:4978', blackMeshWireframe);
-                itowns.DEMUtils.placeObjectOnGround(view.tileLayer, 'EPSG:4978', whiteMesh);   
-            };
+            // var setObjectToGround = function update(/* dt */) {
+            //     itowns.DEMUtils.placeObjectOnGround(view.tileLayer, 'EPSG:4978', blackMeshWireframe);
+            //     itowns.DEMUtils.placeObjectOnGround(view.tileLayer, 'EPSG:4978', whiteMesh);   
+            // };
 
             
-            orangeMesh.updateMatrixWorld();
-            blackMeshWireframe.updateMatrixWorld();
-            whiteMesh.updateMatrixWorld();
+            // orangeMesh.updateMatrixWorld();
+            // blackMeshWireframe.updateMatrixWorld();
+            // whiteMesh.updateMatrixWorld();
             
-            view.scene.add(blackMeshWireframe);
-            view.scene.add(orangeMesh);
-            view.scene.add(whiteMesh);
+            // view.scene.add(blackMeshWireframe);
+            // view.scene.add(orangeMesh);
+            // view.scene.add(whiteMesh);
 
             // ---- Update ----
             var debug = function update(/* dt */) {
-                view.camera3D.getWorldQuaternion(orangeMesh.quaternion);
-                orangeMesh.updateMatrixWorld();
+                // view.camera3D.getWorldQuaternion(orangeMesh.quaternion);
+                // orangeMesh.updateMatrixWorld();
                 const f = view.getLayers().filter((layer) => layer.isFeatureGeometryLayer);
                 // console.log(view);
                 // console.log(view.renderer.xr.getReferenceSpace()); 
@@ -270,10 +258,7 @@
 
             view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, debug);
             // view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_LAYER_UPDATE, setObjectToGround);
-            view.tileLayer.whenReady.then( function _(layer) {
-                itowns.DEMUtils.placeObjectOnGround(view.tileLayer, 'EPSG:4978', blackMeshWireframe);
-                itowns.DEMUtils.placeObjectOnGround(view.tileLayer, 'EPSG:4978', whiteMesh);  
-             });
+
 
              // ---- Debug tool ----
 
