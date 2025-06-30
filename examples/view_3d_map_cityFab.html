@@ -90,16 +90,16 @@
             // Define camera initial position
             const placement = {
                 coord: new itowns.Coordinates('EPSG:4326', longitude, latitude),
-                range: 25,
+                range: 2,
                 tilt: 5,
-                heading: 42,
+                heading: 0,
             }
 
             // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
             const viewerDiv = document.getElementById('viewerDiv');
             
             // Create a GlobeView
-            const view = new itowns.GlobeView(viewerDiv, placement, { webXR: { controllers: true } });
+            const view = new itowns.GlobeView(viewerDiv, placement, { webXR: { controllers: true, cameraOnGround: true } });
             
             // Instantiate three's VR Button
             const arButton = ARButton.createButton(view.renderer);
@@ -116,6 +116,10 @@
                 view.addLayer(new itowns.ColorLayer('Ortho', config),
                 );
             });
+
+            view.tileLayer.opacity = 1;
+
+            // view.camera.camera3D.scale.set(0.1,0.1,0.1);
 
             // ---------- DISPLAY A DIGITAL ELEVATION MODEL : ----------
             // Add two elevation layers, each with a different level of detail.

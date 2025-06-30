@@ -117,7 +117,7 @@ class WebXR extends THREE.EventDispatcher {
             this.view.notifyChange();
 
             if (this.options.controllers) {
-                this.vrControls = new VRControls(this.view, vrHeadSet);
+                this.vrControls = new VRControls(this.view, vrHeadSet, this.options.cameraOnGround);
                 this.dispatchEvent(
                     {
                         type: 'vrControls-initialized',

@@ -8,18 +8,20 @@ import { Layer } from 'Main';
  * @property {Array} controllers - WebXR controllers list
  * */
 class VRControls {
-    static MIN_DELTA_ALTITUDE = 1.8;
+    static MIN_DELTA_ALTITUDE = 1;
     static MAX_NUMBER_CONTROLLERS = 2;  // For now, we are fully supporting a maximum of 2 controllers.
     /**
      * Requires a contextXR variable.
      * @param {*} _view itowns view object
      * @param {*} _groupXR XR 3D object group
+     * @param {boolean} cameraOnGround camera movment always on the ground
      */
-    constructor(_view, _groupXR = {}) {
+    constructor(_view, _groupXR = {}, cameraOnGround = false) {
     // Store instance references.
         this.view = _view;
         this.groupXR = _groupXR;
         this.webXRManager = _view.mainLoop.gfxEngine.renderer.xr;
+        this.cameraOnGround = cameraOnGround;
 
         this.rightButtonPressed = false;
         this.controllers = [];
@@ -202,6 +204,9 @@ Adding a few internal states for reactivity
             if (coordsProjected.altitude - terrainElevation - VRControls.MIN_DELTA_ALTITUDE <= 0) {
                 coordsProjected.altitude = terrainElevation + VRControls.MIN_DELTA_ALTITUDE;
             }
+            if (this.cameraOnGround) {
+                coordsProjected.altitude = terrainElevation + VRControls.MIN_DELTA_ALTITUDE;
+            }
             return coordsProjected.as(this.view.referenceCrs).toVector3();
         } else {
             return trans;
@@ -211,7 +216,7 @@ Adding a few internal states for reactivity
     // Calculate a speed factor based on the camera's altitude.
     getSpeedFactor() {
         const altitude = this.view.controls.getCameraCoordinate ? this.view.controls.getCameraCoordinate().altitude : 1;
-        return Math.min(Math.max(altitude / 50, 2), 2000); // TODO: Adjust if needed -> add as a config ?
+        return 0.5; // TODO: Adjust if needed -> add as a config ?
     }
 
     // Calculate a yaw rotation quaternion based on an axis value from the joystick.
@@ -435,11 +440,10 @@ Adding a few internal states for reactivity
         //  Only apply rotation on 1 axis at the time
         if (Math.abs(ctrl.gamepad.axes[2]) > Math.abs(ctrl.gamepad.axes[3])) {
             offsetRotation = this.getRotationYaw(ctrl.gamepad.axes[2]);
+            this.applyTransformationToXR(trans, offsetRotation); // Yaw rotation only 
         } else {
             offsetRotation = this.getRotationPitch(ctrl.gamepad.axes[3]);
         }
-
-        this.applyTransformationToXR(trans, offsetRotation);
     }
 
     // Right axis stops.
