@@ -90,7 +90,7 @@
             // Define camera initial position
             const placement = {
                 coord: new itowns.Coordinates('EPSG:4326', longitude, latitude),
-                range: 2,
+                range: 10,
                 tilt: 5,
                 heading: 0,
             }
@@ -246,61 +246,57 @@
             // view.scene.add(whiteMesh);
 
             // ---- Update ----
-            var debug = function update(/* dt */) {
-                // view.camera3D.getWorldQuaternion(orangeMesh.quaternion);
-                // orangeMesh.updateMatrixWorld();
-                const f = view.getLayers().filter((layer) => layer.isFeatureGeometryLayer);
-                // console.log(view);
-                // console.log(view.renderer.xr.getReferenceSpace()); 
-                               
-            };
+            function update(/* dt */) {
+                // Add any specific update logic here if needed
+                // Example: quick access to the "WFS Building" layer if necessary
+                // const wfsLayer = view.getLayers().find(l => l.id === 'WFS Building');
+            }
+
+            view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, update);
 
 
-            view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, debug);
-            // view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_LAYER_UPDATE, setObjectToGround);
 
-
-             // ---- Debug tool ----
-
-            function picking(event) {
-                if(view.controls.isPaused) {
-                    let htmlInfo = document.getElementById('info');
-                    let intersects = view.pickObjectsAt(event, 3, 'WFS Building');
-                    let properties;
-                    let info;
-                    let batchId;
-
-                    htmlInfo.innerHTML = ' ';
-
-                    if (intersects.length) {
-                        batchId = intersects[0].object.geometry.attributes.batchId.array[intersects[0].face.a];
-                        properties = intersects[0].object.feature.geometries[batchId].properties;
-
-                        Object.keys(properties).map(function (objectKey) {
-                            let value = properties[objectKey];
-                            if (value) {
-                                let key = objectKey.toString();
-                                if (key[0] !== '_' && key !== 'geometry_name') {
-                                    info = value.toString();
-                                    htmlInfo.innerHTML +='<li><b>' + key + ': </b>' + info + '</li>';
-                                }
-                            }
-                        });
+            /**
+             * Displays the properties of an object in the 'info' div.
+             * @param {Object} properties 
+             */
+            function displayProperties(properties) {
+                const htmlInfo = document.getElementById('info');
+                htmlInfo.innerHTML = '';
+                Object.entries(properties).forEach(([key, value]) => {
+                    if (value && key[0] !== '_' && key !== 'geometry_name') {
+                        htmlInfo.innerHTML += `<li><b>${key}:</b> ${value}</li>`;
                     }
-                }
+                });
             }
 
-            // debug.createTileDebugUI(debugMenu.gui, view);
-            for (var layer of view.getLayers()) {
-                if (layer.id === 'WFS Building') {
-                    layer.whenReady.then( function _(layer) {
-                        // var gui = debug.GeometryDebug.createGeometryDebugUI(debugMenu.gui, view, layer);
-                        // debug.GeometryDebug.addWireFrameCheckbox(gui, view, layer);
-                        window.addEventListener('mousemove', picking, false);
-                    });
-                }
+            /**
+             * Optimized picking function.
+             */
+            function picking(event) {
+                if (!view.controls.isPaused) return;
+
+                const htmlInfo = document.getElementById('info');
+                htmlInfo.innerHTML = '';
+
+                const intersects = view.pickObjectsAt(event, 3, 'WFS Building');
+                if (!intersects.length) return;
+
+                const intersect = intersects[0];
+                const batchId = intersect.object.geometry.attributes.batchId.array[intersect.face.a];
+                const feature = intersect.object.feature;
+                const properties = feature.geometries[batchId].properties;
+
+                displayProperties(properties);
             }
 
+            // Add the event listener only once when the layer is ready
+            const layer = view.getLayers().find(l => l.id === 'WFS Building');
+            if (layer) {
+                layer.whenReady.then(() => {
+                    window.addEventListener('mousemove', picking, false);
+                });
+            }
 
 
         </script>

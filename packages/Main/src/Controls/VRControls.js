@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { Coordinates } from '@itowns/geographic';
 import DEMUtils from 'Utils/DEMUtils';
 import { XRControllerModelFactory } from 'ThreeExtended/webxr/XRControllerModelFactory';
-import { Layer } from 'Main';
 
 /**
  * @property {Array} controllers - WebXR controllers list
@@ -80,7 +79,7 @@ class VRControls {
     }
 
 
-        /**
+    /**
      * Debug
      */
     addColorCube() { 
@@ -407,19 +406,40 @@ Adding a few internal states for reactivity
         }
     }
 
+
+    // ---- Debug tool ----
+
     /**
-     * 
-     * @param {THREE.Object3D} obj 
-     * @returns {Layer}
-     */
-    findLayerInParent(obj) {
-        if (obj.layer) {
-            return obj.layer;
+             * Recursively searches for the first feature in a THREE.Object3D.
+             * @param {THREE.Object3D} obj 
+             * @returns {Object|undefined}
+             */
+    findFeatureInChildren(obj) {
+        if (!obj) { return undefined; }
+        if (obj.feature) { return [obj, obj.feature]; }
+        for (const child of (obj.children || [])) {
+            const found = this.findFeatureInChildren(child);
+            if (found) { return found; }
         }
-        if (obj.parent) {
-            return this.findLayerInParent(obj.parent);
-        }
+        return undefined;
     }
+
+    /**
+             * Returns the 'date_creation' property of the feature whose cleabs matches.
+             * @param {Object} feature 
+             * @param {string} cleabs 
+             * @returns {string|undefined}
+             */
+    findDateCreationByCleabs(feature, cleabs) {
+        if (!feature || !feature.geometries) { return undefined; }
+        for (const geom of feature.geometries) {
+            if (geom.properties.cleabs === cleabs) {
+                return geom.properties.date_creation;
+            }
+        }
+        return undefined;
+    }
+
 
     // Left button pressed.
     /* c8 ignore next 3 */
@@ -434,10 +454,25 @@ Adding a few internal states for reactivity
 
         raycaster.ray.origin = pos;
         raycaster.ray.direction = dir.multiplyScalar(-1);
-        
+
+        // For debugging: search for the creation date of a specific cleabs in all child meshes
+        const cleabsTarget = 'BATIMENT0000002203453311';
+        let dateCreation;
+        const layer = this.view.getLayers().find(l => l.id === 'WFS Building');
+
         // calculate objects intersecting the picking ray
         const intersects = raycaster.intersectObjects(this.view.scene.children);
         if (intersects.length > 0 && intersects[0].object.name == 'button') {
+            for (const child of layer.object3d.children) {
+                const obj = this.findFeatureInChildren(child);
+                dateCreation = this.findDateCreationByCleabs(obj.feature, cleabsTarget);
+                if (dateCreation) { break; }
+            }
+            if (dateCreation) {
+                console.log('Creation date for', cleabsTarget, ':', dateCreation);
+            }
+
+            // obj.material = new THREE.MeshBasicMaterial({ color: 0xffd3b5 });
 
         // TO-DO change color from a batchID
             // const mesh = intersects[0].object;
